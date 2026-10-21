@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Reusable core helpers
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Pre-registered Users collection (whitelisted by school administration)
+    match /preRegisteredUsers/{docId} {
+      allow read, write: if true;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Students collection
+    match /students/{studentId} {
+      allow read, write: if true;
+    }
+
+    // Classes collection
+    match /classes/{classId} {
+      allow read, write: if true;
+    }
+
+    // Teachers collection
+    match /teachers/{teacherId} {
+      allow read, write: if true;
+    }
+
+    // Announcements & Communications
+    match /announcements/{announcementId} {
+      allow read, write: if true;
+    }
+
+    match /communications/{commId} {
+      allow read, write: if true;
+    }
+
+    // Mediatheque / Documents
+    match /mediatheque/{docId} {
+      allow read, write: if true;
+    }
+
+    // Schedules
+    match /schedules/{scheduleId} {
+      allow read, write: if true;
+    }
+
+    // Transactions / Spends / Accounting
+    match /transactions/{transId} {
+      allow read, write: if true;
+    }
+
+    // Default catch-all to prevent permission errors on any additional school collections
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+

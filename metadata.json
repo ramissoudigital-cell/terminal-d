@@ -1,0 +1,10 @@
+{
+  "name": "Terminal-D",
+  "description": "Portail de gestion scolaire avec médiathèque numérique, bulletins, présence et suivi pédagogique pour le Collège Fatoumaba.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

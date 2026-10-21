@@ -1,0 +1,2 @@
+sed -i 's/<tr key={item.id} className="hover:bg-slate-50">/<tr key={item.id} className={`hover:bg-slate-50 ${item.inactive ? "opacity-40 grayscale bg-slate-100 pointer-events-none select-none" : ""}`}>/g' components/LivretScolairePage.tsx
+sed -i 's/<tr key={item.id} className="hover:bg-slate-50 text-\[9px\]">/<tr key={item.id} className={`hover:bg-slate-50 text-[9px] ${item.inactive ? "opacity-40 grayscale pointer-events-none" : ""}`}>/g' components/LivretScolairePage.tsx

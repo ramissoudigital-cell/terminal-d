@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Terminale-D</string>
+    <string name="title_activity_main">Terminale-D</string>
+    <string name="package_name">com.dashboard.school</string>
+    <string name="custom_url_scheme">com.dashboard.school</string>
+</resources>
