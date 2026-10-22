@@ -746,7 +746,8 @@ export const RegistrationPage: React.FC<RegistrationPageProps> = ({ onAddStudent
                                         { label: "EDHC", value: "EDHC" },
                                         { label: "Sciences et Technologies", value: "Sciences et Technologies" },
                                         { label: "Éducation Musicale", value: "Éducation Musicale" },
-                                        { label: "Arts Plastiques", value: "Arts Plastiques" }
+                                        { label: "Arts Plastiques", value: "Arts Plastiques" },
+                                        { label: "Conduite", value: "Conduite" }
                                     ]}
                                     icon={<Book size={18} />}
                                 />

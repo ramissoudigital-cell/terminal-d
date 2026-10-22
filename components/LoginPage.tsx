@@ -10,7 +10,8 @@ import {
   getSubjectAccreditationCode,
   getTeacherIndividualAccreditationCode,
   setTeacherIndividualAccreditationCode,
-  normalizeSubjectKey
+  normalizeSubjectKey,
+  initAccreditationRealtimeSync
 } from '../src/utils/accreditationUtils';
 import { CustomSubjectSelect } from './CustomSubjectSelect';
 
@@ -29,9 +30,10 @@ const SUBJECTS = [
   { value: "hg", label: "Histoire-Géographie" },
   { value: "pc", label: "Physique-Chimie" },
   { value: "svt", label: "SVT" },
+  { value: "phil", label: "Philosophie" },
   { value: "eps", label: "EPS" },
-  { value: "art", label: "Arts Plastiques" },
-  { value: "mus", label: "Éducation Musicale" }
+  { value: "info", label: "Informatique" },
+  { value: "cond", label: "Conduite" }
 ];
 
 const INITIAL_USERS: UserType[] = [
@@ -253,7 +255,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       setParentChildrenCount(10);
     }
   };
-  
+
+  useEffect(() => {
+    initAccreditationRealtimeSync();
+  }, []);
+
   // Forms State
   const [formData, setFormData] = useState({
       matricule: "",
@@ -328,9 +334,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       }
 
       let storedCode = 'DIR-2024';
-      const cleanTarget = storedCode.trim().toUpperCase();
+      if (selectedLevel === "Niveau 2") storedCode = localStorage.getItem('acc_niv2') || 'EDU-2024';
+      else if (selectedLevel === "Niveau 3") storedCode = localStorage.getItem('acc_niv3') || 'PROF-2024';
+      else if (selectedLevel === "Niveau 4") storedCode = localStorage.getItem('acc_niv4') || 'CAISSE-2024';
+      else if (selectedLevel === "Niveau 5") storedCode = localStorage.getItem('acc_niv5') || 'DIR-2024';
 
-      if (cleanInput !== cleanTarget && cleanInput !== 'ACC-2024' && cleanInput !== 'ADMIN' && cleanInput !== 'DIR-2024' && cleanInput !== 'PROF-2024' && cleanInput !== 'PROF') {
+      const cleanTarget = storedCode.trim().toUpperCase();
+      const hasCustomLevel = Boolean(
+        (selectedLevel === "Niveau 2" && localStorage.getItem('acc_niv2')) ||
+        (selectedLevel === "Niveau 3" && localStorage.getItem('acc_niv3')) ||
+        (selectedLevel === "Niveau 4" && localStorage.getItem('acc_niv4')) ||
+        (selectedLevel === "Niveau 5" && localStorage.getItem('acc_niv5'))
+      );
+
+      const isValidLevel = cleanInput === cleanTarget || 
+        cleanInput === 'ADMIN' || 
+        (!hasCustomLevel && (cleanInput === 'ACC-2024' || cleanInput === 'DIR-2024' || cleanInput === 'PROF-2024' || cleanInput === 'PROF'));
+
+      if (!isValidLevel) {
           setLoginError("Code d'accréditation invalide");
           return;
       }
@@ -1045,9 +1066,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
                   {/* Matière Enseignée - Custom Stylish Dropdown */}
                   <div className="mb-4">
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 ml-1">
-                      Matière enseignée
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5 ml-1">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Matière enseignée
+                      </label>
+                      <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
+                        {ALL_TEACHING_SUBJECTS.length} matières officielles
+                      </span>
+                    </div>
                     <CustomSubjectSelect
                       value={selectedTeacherSubject}
                       onChange={(sub) => {

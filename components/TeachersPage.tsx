@@ -7,9 +7,8 @@ import { CustomMultiSelect } from './CustomMultiSelect';
 import { getStoredTimeSlots, getLunchBreakIndex } from './SchedulePage';
 import ReflectiveCard from './ReflectiveCard';
 import { ProfileCard } from './ProfileCard';
-import { isSameClass } from '../src/utils/parentUtils';
 import { saveRealtimeDocument, deleteRealtimeDocument } from '../src/services/firebaseService';
-import { getTeacherIndividualAccreditationCode, setTeacherIndividualAccreditationCode } from '../src/utils/accreditationUtils';
+import { getTeacherIndividualAccreditationCode, setTeacherIndividualAccreditationCode, setSubjectAccreditationCode, normalizeSubjectKey } from '../src/utils/accreditationUtils';
 
 interface TeachersPageProps {
     teachers?: Teacher[];
@@ -26,7 +25,7 @@ const SUBJECTS = [
     'Mathématiques', 'Français', 'Anglais', 'Hist-Géo', 'SVT', 
     'Physique-Chimie', 'EPS', 'Philosophie', 'Informatique', 'Espagnol', 
     'Allemand', 'Arts Plastiques', 'Musique', 'Devoir',
-    'Histoire', 'Géographie', 'EDHC', 'Sciences et Technologies', 'Éducation Musicale', 'Sciences et Technologies (notions de base)'
+    'Histoire', 'Géographie', 'EDHC', 'Sciences et Technologies', 'Éducation Musicale', 'Sciences et Technologies (notions de base)', 'Conduite'
 ];
 
 const CLASSES = [
@@ -97,6 +96,7 @@ const getSubjectColor = (subject: string): string => {
         case 'Allemand': return 'bg-lime-100 border-lime-200 text-lime-700';
         case 'Arts Plastiques': return 'bg-fuchsia-100 border-fuchsia-200 text-fuchsia-700';
         case 'Musique': return 'bg-violet-100 border-violet-200 text-violet-700';
+        case 'Conduite': return 'bg-emerald-100 border-emerald-200 text-emerald-800';
         case 'Devoir':
         case 'Devoirs':
         case 'Étude': return 'bg-gray-100 border-gray-200 text-gray-600';
@@ -244,19 +244,82 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
           const list: Teacher[] = saved ? JSON.parse(saved) : teachers;
           const newList = list.map(t => String(t.id) === String(updated.id) ? updated : t);
           localStorage.setItem('school_db_teachers', JSON.stringify(newList));
+
+          // Also synchronize in school_db_users and school_registered_users
+          const localUsers = localStorage.getItem('school_db_users');
+          if (localUsers) {
+            try {
+              const uList = JSON.parse(localUsers);
+              const newUList = uList.map((u: any) => {
+                if (String(u.id) === String(updated.id) || (u.email && updated.email && u.email.toLowerCase() === updated.email.toLowerCase())) {
+                  return {
+                    ...u,
+                    name: updated.name,
+                    email: updated.email,
+                    phone: updated.phone,
+                    subject: updated.subject,
+                    assignedClasses: updated.assignedClasses,
+                    accreditationCode: formattedAccred || updated.accreditationCode
+                  };
+                }
+                return u;
+              });
+              localStorage.setItem('school_db_users', JSON.stringify(newUList));
+            } catch (e) {}
+          }
+
+          const regUsers = localStorage.getItem('school_registered_users');
+          if (regUsers) {
+            try {
+              const rList = JSON.parse(regUsers);
+              const newRList = rList.map((u: any) => {
+                if (String(u.id) === String(updated.id) || (u.email && updated.email && u.email.toLowerCase() === updated.email.toLowerCase())) {
+                  return {
+                    ...u,
+                    name: updated.name,
+                    email: updated.email,
+                    phone: updated.phone,
+                    subject: updated.subject,
+                    assignedClasses: updated.assignedClasses,
+                    accreditationCode: formattedAccred || updated.accreditationCode
+                  };
+                }
+                return u;
+              });
+              localStorage.setItem('school_registered_users', JSON.stringify(newRList));
+            } catch (e) {}
+          }
+
           window.dispatchEvent(new Event('storage'));
       } catch (err) {
           console.error(err);
       }
 
-      // Sync to Firestore in real-time
+      // Sync to Firestore in real-time in BOTH 'teachers' and 'users' collections
       try {
           await saveRealtimeDocument('teachers', String(updated.id), updated);
+          
+          const userDocId = updated.uid || updated.authUid;
+          if (userDocId) {
+            await saveRealtimeDocument('users', String(userDocId), {
+              name: updated.name,
+              email: updated.email,
+              phone: updated.phone,
+              subject: updated.subject,
+              assignedClasses: updated.assignedClasses,
+              matricule: updated.matricule,
+              accreditationCode: formattedAccred || updated.accreditationCode
+            });
+          }
+
           if (formattedAccred) {
             setTeacherIndividualAccreditationCode(
               { id: updated.id, email: updated.email, subject: updated.subject },
               formattedAccred
             );
+            if (updated.subject) {
+              setSubjectAccreditationCode(updated.subject, formattedAccred);
+            }
             await saveRealtimeDocument('accreditation_codes', String(updated.id), {
               teacherId: updated.id,
               email: updated.email,
@@ -264,6 +327,13 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
               code: formattedAccred,
               updatedAt: Date.now()
             });
+            if (updated.subject) {
+              await saveRealtimeDocument('accreditation_codes', `subject_${normalizeSubjectKey(updated.subject)}`, {
+                subject: updated.subject,
+                code: formattedAccred,
+                updatedAt: Date.now()
+              });
+            }
           }
       } catch (err) {
           console.warn('Realtime teacher update notice:', err);
@@ -284,13 +354,25 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       if (!teacherToDelete) return;
       const t = teacherToDelete;
       const idStr = String(t.id);
+      const emailStr = (t.email || '').toLowerCase().trim();
+      const matStr = (t.matricule || '').toLowerCase().trim();
+      const uidStr = String(t.uid || t.authUid || '').trim();
+
+      const newIdsToAdd = [idStr, emailStr, matStr, uidStr, matStr ? `PROF-${matStr}` : ''].filter(Boolean);
 
       try {
           const deletedIds: string[] = JSON.parse(localStorage.getItem('deleted_teacher_ids') || '[]');
-          if (!deletedIds.includes(idStr)) {
-              deletedIds.push(idStr);
-              localStorage.setItem('deleted_teacher_ids', JSON.stringify(deletedIds));
-          }
+          newIdsToAdd.forEach(id => {
+            if (!deletedIds.includes(id)) {
+              deletedIds.push(id);
+            }
+          });
+          localStorage.setItem('deleted_teacher_ids', JSON.stringify(deletedIds));
+          // Persist deleted IDs permanently to Firestore system_metadata collection
+          saveRealtimeDocument('system_metadata', 'deleted_teachers', {
+            ids: deletedIds,
+            updatedAt: Date.now()
+          }).catch(console.error);
       } catch (e) {
           console.error(e);
       }
@@ -301,19 +383,68 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       try {
           const saved = localStorage.getItem('school_db_teachers');
           const list: Teacher[] = saved ? JSON.parse(saved) : teachers;
-          const newList = list.filter(item => String(item.id) !== idStr);
+          const newList = list.filter(item => 
+            String(item.id) !== idStr &&
+            (!emailStr || (item.email || '').toLowerCase().trim() !== emailStr) &&
+            (!matStr || (item.matricule || '').toLowerCase().trim() !== matStr)
+          );
           localStorage.setItem('school_db_teachers', JSON.stringify(newList));
           localStorage.removeItem(`teacher_schedule_${idStr}`);
+
+          // Also clean up school_db_users and school_registered_users
+          const localUsers = localStorage.getItem('school_db_users');
+          if (localUsers) {
+            try {
+              const uList = JSON.parse(localUsers);
+              const newUList = uList.filter((u: any) => 
+                String(u.id) !== idStr && 
+                String(u.id) !== uidStr &&
+                (!emailStr || (u.email || '').toLowerCase().trim() !== emailStr) &&
+                (!matStr || (u.matricule || '').toLowerCase().trim() !== matStr)
+              );
+              localStorage.setItem('school_db_users', JSON.stringify(newUList));
+            } catch (e) {}
+          }
+
+          const regUsers = localStorage.getItem('school_registered_users');
+          if (regUsers) {
+            try {
+              const rList = JSON.parse(regUsers);
+              const newRList = rList.filter((u: any) => 
+                String(u.id) !== idStr && 
+                String(u.id) !== uidStr &&
+                (!emailStr || (u.email || '').toLowerCase().trim() !== emailStr) &&
+                (!matStr || (u.matricule || '').toLowerCase().trim() !== matStr)
+              );
+              localStorage.setItem('school_registered_users', JSON.stringify(newRList));
+            } catch (e) {}
+          }
+
           window.dispatchEvent(new Event('storage'));
       } catch (err) {
           console.error(err);
       }
 
-      // Remove from Firestore
+      // Remove from Firestore teachers collection
       try {
           await deleteRealtimeDocument('teachers', idStr);
+          if (uidStr && uidStr !== idStr) {
+            await deleteRealtimeDocument('teachers', uidStr);
+          }
       } catch (err) {
           console.warn('Realtime teacher delete notice:', err);
+      }
+
+      // Also remove from Firestore users collection
+      try {
+          if (uidStr) {
+            await deleteRealtimeDocument('users', uidStr);
+          }
+          if (idStr && idStr !== uidStr) {
+            await deleteRealtimeDocument('users', idStr);
+          }
+      } catch (err) {
+          console.warn('Realtime user delete notice:', err);
       }
 
       setLastUpdateTs(Date.now());
@@ -374,8 +505,49 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
   };
 
   const isLevel1 = currentUser?.accessLevel === 1 || currentUser?.role === 'student' || currentUser?.role === 'parent';
-  // Allow managing teacher profiles for admin/teachers, not students/parents
-  const canManageProfile = !isLevel1;
+  const isDirectorOrAdmin = Boolean(
+    currentUser && (
+      currentUser.accessLevel === 5 ||
+      currentUser.role === 'director' ||
+      currentUser.role === 'admin' ||
+      currentUser.role === 'superadmin'
+    )
+  );
+  const isTeacherRole = Boolean(
+    currentUser && (
+      currentUser.role === 'teacher' ||
+      currentUser.role === 'professeur' ||
+      currentUser.accessLevel === 3
+    )
+  );
+
+  // Check if a specific teacher card belongs to the currently logged in user
+  const isCurrentTeacherSelf = (t: Teacher) => {
+    if (!currentUser) return false;
+    return Boolean(
+      String(t.id) === String(currentUser.id) ||
+      t.uid === currentUser.id ||
+      t.authUid === currentUser.id ||
+      (currentUser.email && t.email && t.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+      (currentUser.matricule && t.matricule && t.matricule.toLowerCase() === currentUser.matricule.toLowerCase()) ||
+      (currentUser.name && t.name && t.name.toLowerCase() === currentUser.name.toLowerCase())
+    );
+  };
+
+  // User specification:
+  // Teachers ONLY have access to the options button on their OWN card, NOT for other teachers!
+  // Director/Admin has access to the options button for ALL teachers.
+  // Students and parents have NO access to options.
+  const canManageTeacherCard = (t: Teacher) => {
+    if (isLevel1) return false;
+    if (isDirectorOrAdmin) return true;
+    if (isTeacherRole) {
+      return isCurrentTeacherSelf(t);
+    }
+    return false;
+  };
+
+  const canManageProfile = isDirectorOrAdmin;
   const studentClass = restrictedClass || currentUser?.assignedClass || (currentUser?.section === 'Primaire' ? 'CM2' : 'Terminale D1');
 
   // Find student record if available
@@ -505,7 +677,21 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       }
     })();
 
-    let list = teachers.filter(t => !deletedIds.includes(String(t.id)));
+    const isDeletedItem = (item: any) => {
+      if (!item) return true;
+      const itemId = String(item.id || '');
+      const itemUid = String(item.uid || item.authUid || '');
+      const itemMat = String(item.matricule || '').toLowerCase().trim();
+      const itemEmail = String(item.email || '').toLowerCase().trim();
+      return (
+        deletedIds.includes(itemId) ||
+        (itemUid && deletedIds.includes(itemUid)) ||
+        (itemMat && (deletedIds.includes(itemMat) || deletedIds.includes(`prof-${itemMat}`))) ||
+        (itemEmail && deletedIds.includes(itemEmail))
+      );
+    };
+
+    let list = teachers.filter(t => !isDeletedItem(t));
     try {
       const local = localStorage.getItem('school_db_teachers');
       if (local) {
@@ -513,13 +699,13 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
         if (Array.isArray(parsed)) {
           const localMap = new Map<string, any>();
           parsed.forEach((lt: any) => {
-            if (!deletedIds.includes(String(lt.id))) {
+            if (!isDeletedItem(lt)) {
               localMap.set(String(lt.id), lt);
             }
           });
           list = list.map(t => localMap.get(String(t.id)) || t);
           parsed.forEach((lt: any) => {
-            if (!deletedIds.includes(String(lt.id)) && !list.some(t => String(t.id) === String(lt.id))) {
+            if (!isDeletedItem(lt) && !list.some(t => String(t.id) === String(lt.id))) {
               list.push(lt);
             }
           });
@@ -533,7 +719,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
         if (Array.isArray(parsedUsers)) {
           parsedUsers.forEach((u: any) => {
             const isTeacher = u.role === 'teacher' || u.accessLevel === 3;
-            if (isTeacher) {
+            if (isTeacher && !isDeletedItem(u)) {
               const alreadyExists = list.some(t => 
                 String(t.id) === String(u.id) || 
                 t.uid === u.id || 
@@ -566,7 +752,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
     } catch (e) {}
 
     const isTeacherUser = currentUser?.role === 'teacher' || currentUser?.accessLevel === 3;
-    if (isTeacherUser && currentUser) {
+    if (isTeacherUser && currentUser && !isDeletedItem(currentUser)) {
       const exists = list.some(t => 
         String(t.id) === String(currentUser.id) ||
         t.uid === currentUser.id ||
@@ -1046,7 +1232,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                             </td>
                             <td className="py-4 px-4 text-right print:hidden">
                               <div className="flex items-center justify-end gap-1">
-                                {canManageProfile && (
+                                {canManageTeacherCard(teacher) && (
                                   <>
                                     <button
                                       onClick={() => handleOpenEditTeacher(teacher)}
@@ -1150,7 +1336,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                               </span>
                             </div>
 
-                            {canManageProfile && (
+                            {canManageTeacherCard(teacher) && (
                               <div className="relative">
                                 <button
                                   type="button"

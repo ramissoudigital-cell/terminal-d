@@ -62,6 +62,7 @@ const getTeacherNameForSubject = (subject: string, teachersList?: any[]): string
     'Musique': 'M. SENGHOR David',
     'Devoir': 'Surveillant Général',
     'Étude': 'Surveillant Général',
+    'Conduite': 'Professeur de Conduite',
   };
   return fallbackMap[subject] || 'Professeur de ' + subject;
 };
@@ -420,10 +421,6 @@ export const DailyScheduleMobileView: React.FC<DailyScheduleMobileViewProps> = (
               <div className="flex items-center gap-2">
                 <span className="text-[20px] font-bold text-white leading-tight">
                   {classNameTitle ? classNameTitle.replace(/terminale/gi, 'Tle').replace(/TERMINALE/g, 'TLE') : "Emploi du temps"}
-                </span>
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/30 border border-emerald-300/40 text-[10px] font-bold text-white shadow-xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
-                  <span>En direct</span>
                 </span>
               </div>
               <span className="text-[12px] font-medium text-white/80">

@@ -391,6 +391,7 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
                   className="reflective-card--horizontal"
                   name={displayName}
                   role={displayClass}
+                  gender={displayGender === 'F' ? 'Féminin (F)' : 'Masculin (M)'}
                   badge={displaySchool || 'Collège Fatoumaba'}
                   status={isAffecte ? 'Affecté (État)' : 'Non Affecté'}
                   statusColor={isAffecte ? '#22c55e' : '#f59e0b'}

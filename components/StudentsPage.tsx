@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { Student, ClassItem, getSubjectsForClass, GradeItem, AnalyticsData } from '../types';
 import { mockClasses } from '../data/mockData';
+import { getSubjectCoef } from './TransactionList';
 
 interface StudentsPageProps {
   students?: Student[];
@@ -254,80 +255,145 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
   const [classListSearch, setClassListSearch] = useState('');
   const [classListSortBy, setClassListSortBy] = useState<'rank' | 'name' | 'average_asc'>('rank');
 
-  // Helper pour extraire la note d'un élève dans une matière donnée sur 20
+  // Helper pour extraire la vraie note d'un élève dans une matière donnée sur 20 en temps réel
   const getStudentSubjectScore = (student: Student, subjectName: string): { score: number | null; display: string } => {
     const trimSubjects = student.trimesters?.[activeTrimester]?.subjects || student.subjects || [];
     const sub = trimSubjects.find(s => isSameSubject(s.name, subjectName));
     if (!sub) return { score: null, display: '—' };
 
-    const validGrades = (sub.grades || []).filter(g => g.type !== 'plus' && g.type !== 'minus' && !g.isBonus);
+    // STRICT: Seules les vraies notes saisies dans sub.grades sont prises en compte
+    const validGrades = (sub.grades || []).filter(g => 
+      g && 
+      g.type !== 'plus' && 
+      g.type !== 'minus' && 
+      !g.isBonus && 
+      typeof g.score === 'number' && 
+      !isNaN(g.score)
+    );
+
     if (validGrades.length > 0) {
       const avg = validGrades.reduce((acc, g) => acc + normalizeTo20(g.score, g.maxScore), 0) / validGrades.length;
       return { score: parseFloat(avg.toFixed(2)), display: avg.toFixed(1) };
     }
-    if (typeof sub.average === 'number' && sub.average > 0) {
-      return { score: parseFloat(sub.average.toFixed(2)), display: sub.average.toFixed(1) };
-    }
-    if (typeof (sub as any).value === 'number' && (sub as any).value > 0) {
-      return { score: parseFloat((sub as any).value.toFixed(2)), display: (sub as any).value.toFixed(1) };
-    }
+
+    // Aucune note fictive : afficher un tiret
     return { score: null, display: '—' };
   };
 
-  // Helper pour extraire la moyenne générale d'un élève
-  const getStudentGeneralAverage = (student: Student): number => {
-    if (typeof student.trimesters?.[activeTrimester]?.average === 'number' && student.trimesters[activeTrimester].average > 0) {
-      return parseFloat(student.trimesters[activeTrimester].average.toFixed(2));
-    }
-    // Calcul de la moyenne sur les 9 matières officielles
-    const scores = STATS_OFFICIAL_SUBJECTS
-      .map(subj => getStudentSubjectScore(student, subj).score)
-      .filter((s): s is number => s !== null);
+  // Helper pour extraire la moyenne générale en temps réel avec coefficients officiels
+  const getStudentGeneralAverage = (student: Student): number | null => {
+    let totalWeightedScore = 0;
+    let totalCoeffs = 0;
+    let evaluatedSubjectsCount = 0;
 
-    if (scores.length > 0) {
-      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-      return parseFloat(avg.toFixed(2));
+    STATS_OFFICIAL_SUBJECTS.forEach(subj => {
+      const res = getStudentSubjectScore(student, subj);
+      if (res.score !== null) {
+        evaluatedSubjectsCount++;
+        const coef = getSubjectCoef(student.class || 'Terminale D', subj);
+        const effectiveCoef = coef > 0 ? coef : 1;
+        totalWeightedScore += res.score * effectiveCoef;
+        totalCoeffs += effectiveCoef;
+      }
+    });
+
+    if (evaluatedSubjectsCount > 0 && totalCoeffs > 0) {
+      return parseFloat((totalWeightedScore / totalCoeffs).toFixed(2));
     }
-    return 0;
+
+    return null;
   };
 
-  // Liste enrichie des élèves de Terminale D triée par moyenne pour établir le classement
-  const enrichedTerminaleStudents = useMemo(() => {
-    const mapped = classStudents.map(student => {
+  // Interface pour un élève dans la liste de classe
+  interface EnrichedTerminaleStudent {
+    student: Student;
+    generalAverage: number | null;
+    hasRealAverage: boolean;
+    evaluatedSubjectsCount: number;
+    subjectScores: Record<string, { score: number | null; display: string }>;
+    isAdmis: boolean;
+    rank: number;
+    rankDisplay: string;
+  }
+
+  // Liste enrichie des élèves de Terminale D triée par moyenne réelle pour établir le classement
+  const enrichedTerminaleStudents = useMemo<EnrichedTerminaleStudent[]>(() => {
+    const evaluated: any[] = [];
+    const unEvaluated: any[] = [];
+
+    classStudents.forEach(student => {
       const generalAverage = getStudentGeneralAverage(student);
       const subjectScores: Record<string, { score: number | null; display: string }> = {};
+      let evaluatedSubjectsCount = 0;
+
       STATS_OFFICIAL_SUBJECTS.forEach(subj => {
-        subjectScores[subj] = getStudentSubjectScore(student, subj);
+        const sc = getStudentSubjectScore(student, subj);
+        subjectScores[subj] = sc;
+        if (sc.score !== null) evaluatedSubjectsCount++;
       });
 
-      return {
+      const hasRealAverage = generalAverage !== null && generalAverage > 0 && evaluatedSubjectsCount > 0;
+
+      const item = {
         student,
         generalAverage,
+        hasRealAverage,
+        evaluatedSubjectsCount,
         subjectScores,
-        isAdmis: generalAverage >= referenceThreshold
+        isAdmis: hasRealAverage && generalAverage !== null ? generalAverage >= referenceThreshold : false
+      };
+
+      if (hasRealAverage) {
+        evaluated.push(item);
+      } else {
+        unEvaluated.push(item);
+      }
+    });
+
+    // Tri des élèves évalués par moyenne générale décroissante
+    evaluated.sort((a, b) => (b.generalAverage ?? 0) - (a.generalAverage ?? 0));
+
+    // Attribution des rangs réels uniquement aux élèves ayant de vraies notes
+    const rankedEvaluated = evaluated.map((item, index) => {
+      let rankDisplay = `${index + 1}e`;
+      if (index === 0) rankDisplay = '1er';
+
+      // Gestion des ex-aequo
+      if (index > 0 && item.generalAverage === evaluated[index - 1].generalAverage) {
+        const prevDisplay = evaluated[index - 1].rankDisplay;
+        rankDisplay = prevDisplay.endsWith('ex') ? prevDisplay : `${prevDisplay} ex`;
+      }
+
+      return {
+        ...item,
+        rank: index + 1,
+        rankDisplay
       };
     });
 
-    // Tri initial par moyenne décroissante pour attribuer les rangs (#1, #2, ...)
-    mapped.sort((a, b) => b.generalAverage - a.generalAverage);
-
-    return mapped.map((item, index) => ({
+    // Élèves non encore évalués : aucun rang fictif
+    const rankedUnEvaluated = unEvaluated.map(item => ({
       ...item,
-      rank: index + 1
+      rank: 9999,
+      rankDisplay: '—'
     }));
+
+    return [...rankedEvaluated, ...rankedUnEvaluated];
   }, [classStudents, activeTrimester, referenceThreshold]);
 
-  // Statistiques de la classe de Terminale D
+  // Statistiques de la classe de Terminale D basées uniquement sur les données réelles
   const classOverallAvg = useMemo(() => {
-    if (enrichedTerminaleStudents.length === 0) return '0.00';
-    const sum = enrichedTerminaleStudents.reduce((acc, st) => acc + st.generalAverage, 0);
-    return (sum / enrichedTerminaleStudents.length).toFixed(2);
+    const evaluated = enrichedTerminaleStudents.filter(st => st.hasRealAverage && st.generalAverage !== null);
+    if (evaluated.length === 0) return '—';
+    const sum = evaluated.reduce((acc, st) => acc + (st.generalAverage || 0), 0);
+    return (sum / evaluated.length).toFixed(2);
   }, [enrichedTerminaleStudents]);
 
   const classPassRate = useMemo(() => {
-    if (enrichedTerminaleStudents.length === 0) return '0.0';
-    const passCount = enrichedTerminaleStudents.filter(st => st.isAdmis).length;
-    return ((passCount / enrichedTerminaleStudents.length) * 100).toFixed(1);
+    const evaluated = enrichedTerminaleStudents.filter(st => st.hasRealAverage && st.generalAverage !== null);
+    if (evaluated.length === 0) return '—';
+    const passCount = evaluated.filter(st => st.isAdmis).length;
+    return ((passCount / evaluated.length) * 100).toFixed(1);
   }, [enrichedTerminaleStudents]);
 
   // Liste filtrée et triée pour affichage
@@ -346,9 +412,19 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
     if (classListSortBy === 'name') {
       result.sort((a, b) => a.student.name.localeCompare(b.student.name));
     } else if (classListSortBy === 'average_asc') {
-      result.sort((a, b) => a.generalAverage - b.generalAverage);
+      result.sort((a, b) => {
+        if (!a.hasRealAverage && !b.hasRealAverage) return 0;
+        if (!a.hasRealAverage) return 1;
+        if (!b.hasRealAverage) return -1;
+        return (a.generalAverage ?? 0) - (b.generalAverage ?? 0);
+      });
     } else {
-      result.sort((a, b) => a.rank - b.rank);
+      result.sort((a, b) => {
+        if (!a.hasRealAverage && !b.hasRealAverage) return a.student.name.localeCompare(b.student.name);
+        if (!a.hasRealAverage) return 1;
+        if (!b.hasRealAverage) return -1;
+        return a.rank - b.rank;
+      });
     }
 
     return result;
@@ -427,13 +503,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
       const grades = (sub?.grades || []).filter(g => g.type !== 'plus' && g.type !== 'minus' && !g.isBonus);
 
       if (selectedEvaluationKey === 'ALL') {
-        // Vue moyenne générale de la matière pour l'élève
-        const hasGrades = grades.length > 0;
-        const subAverage = typeof sub?.average === 'number' && sub.average > 0 ? sub.average : (
-          hasGrades ? grades.reduce((acc, g) => acc + normalizeTo20(g.score, g.maxScore), 0) / grades.length : 0
-        );
-
-        if (!hasGrades && (!sub?.average || sub.average === 0)) {
+        // Vue moyenne générale de la matière pour l'élève en temps réel
+        if (grades.length === 0) {
           return {
             student,
             hasGrade: false,
@@ -444,6 +515,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
           };
         }
 
+        const subAverage = grades.reduce((acc, g) => acc + normalizeTo20(g.score, g.maxScore), 0) / grades.length;
         const normalizedScore = parseFloat(subAverage.toFixed(2));
         
         // Progression entre la première et la dernière note si plusieurs évaluations
@@ -604,9 +676,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
 
           if (grades.length > 0) {
             avg = grades.reduce((acc, g) => acc + normalizeTo20(g.score, g.maxScore), 0) / grades.length;
-            hasVal = true;
-          } else if (typeof sub.average === 'number' && sub.average > 0) {
-            avg = sub.average;
             hasVal = true;
           }
 
@@ -876,14 +945,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <BookOpen size={14} className="text-sky-500" /> Matières enseignées ({classSubjects.length})
             </span>
-            {selectedSubjectName !== 'ALL' && (
-              <button 
-                onClick={() => setSelectedSubjectName('ALL')}
-                className="text-xs font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1 transition-colors"
-              >
-                ← Voir la vue générale
-              </button>
-            )}
           </div>
 
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
@@ -985,11 +1046,15 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                 </div>
                 <div className="bg-white px-3.5 py-2 rounded-2xl border border-slate-100 shadow-2xs text-center min-w-[95px]">
                   <div className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">Moyenne Classe</div>
-                  <div className="text-base md:text-lg font-black text-emerald-600">{classOverallAvg}/20</div>
+                  <div className="text-base md:text-lg font-black text-emerald-600">
+                    {classOverallAvg !== '—' ? `${classOverallAvg}/20` : '—'}
+                  </div>
                 </div>
                 <div className="bg-white px-3.5 py-2 rounded-2xl border border-slate-100 shadow-2xs text-center min-w-[85px]">
                   <div className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">Taux Réussite</div>
-                  <div className="text-base md:text-lg font-black text-sky-600">{classPassRate}%</div>
+                  <div className="text-base md:text-lg font-black text-sky-600">
+                    {classPassRate !== '—' ? `${classPassRate}%` : '—'}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1105,8 +1170,9 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                       </tr>
                     ) : (
                       displayClassList.map((item) => {
-                        const medal = item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : null;
-                        const mention = item.generalAverage >= 16 ? 'Très Bien' :
+                        const medal = item.hasRealAverage && item.rank === 1 ? '🥇' : item.hasRealAverage && item.rank === 2 ? '🥈' : item.hasRealAverage && item.rank === 3 ? '🥉' : null;
+                        const mention = !item.hasRealAverage || item.generalAverage === null ? '—' :
+                                        item.generalAverage >= 16 ? 'Très Bien' :
                                         item.generalAverage >= 14 ? 'Bien' :
                                         item.generalAverage >= 12 ? 'Assez Bien' :
                                         item.generalAverage >= 10 ? 'Passable' : 'Insuffisant';
@@ -1120,11 +1186,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                             {/* Rang */}
                             <td className="py-3 px-3 text-center font-bold">
                               {medal ? (
-                                <span className="text-base" title={`#${item.rank}`}>{medal}</span>
-                              ) : (
-                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-black text-xs">
-                                  #{item.rank}
+                                <span className="text-base" title={`#${item.rankDisplay}`}>{medal}</span>
+                              ) : item.hasRealAverage ? (
+                                <span className="inline-flex items-center justify-center px-2 h-6 rounded-full bg-slate-100 text-slate-700 font-black text-xs">
+                                  #{item.rankDisplay}
                                 </span>
+                              ) : (
+                                <span className="text-slate-300 font-bold text-xs">—</span>
                               )}
                             </td>
 
@@ -1153,13 +1221,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                             {/* Moyenne Générale */}
                             <td className="py-3 px-3 text-center bg-slate-50/50 group-hover:bg-slate-100/50 border-x border-slate-100">
                               <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-xl font-black text-xs md:text-sm ${
-                                item.generalAverage >= referenceThreshold
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  : item.generalAverage > 0
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                item.hasRealAverage && item.generalAverage !== null
+                                  ? item.generalAverage >= referenceThreshold
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-rose-100 text-rose-800 border border-rose-200'
                                   : 'bg-slate-100 text-slate-400'
                               }`}>
-                                {item.generalAverage > 0 ? `${item.generalAverage.toFixed(2)}` : '—'}
+                                {item.hasRealAverage && item.generalAverage !== null ? `${item.generalAverage.toFixed(2)}` : '—'}
                               </span>
                             </td>
 
@@ -1188,13 +1256,17 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
 
                             {/* Mention */}
                             <td className="py-3 px-3 text-center">
-                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                item.generalAverage >= 14 ? 'bg-emerald-100 text-emerald-800' :
-                                item.generalAverage >= 10 ? 'bg-sky-100 text-sky-800' :
-                                'bg-rose-100 text-rose-700'
-                              }`}>
-                                {mention}
-                              </span>
+                              {item.hasRealAverage && item.generalAverage !== null ? (
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                  item.generalAverage >= 14 ? 'bg-emerald-100 text-emerald-800' :
+                                  item.generalAverage >= 10 ? 'bg-sky-100 text-sky-800' :
+                                  'bg-rose-100 text-rose-700'
+                                }`}>
+                                  {mention}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 font-semibold text-xs">—</span>
+                              )}
                             </td>
 
                             {/* Action */}
@@ -1400,50 +1472,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                 </div>
               </div>
 
-              {/* Sélecteur d'évaluation (Toutes / Interro 1 / Devoir 1...) */}
-              <div className="flex items-center gap-2 flex-wrap">
+              {/* Information Évaluation (Moyenne générale) */}
+              <div className="flex items-center gap-2 min-w-0 max-w-full">
                 <span className="text-xs font-semibold text-slate-500 shrink-0">Évaluation :</span>
-                <select
-                  value={selectedEvaluationKey}
-                  onChange={(e) => setSelectedEvaluationKey(e.target.value)}
-                  className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm font-bold text-slate-800 shadow-2xs outline-none focus:border-sky-500 cursor-pointer"
+                <div 
+                  className="inline-flex items-center gap-2 bg-white/95 border border-slate-200/90 rounded-xl px-3 py-1.5 text-xs md:text-sm font-bold text-slate-700 shadow-2xs min-w-0 max-w-full"
+                  title="Toutes les évaluations (Moyenne générale)"
                 >
-                  <option value="ALL">Toutes les évaluations (Moyenne générale)</option>
-                  {subjectEvaluations.map(ev => (
-                    <option key={ev.title} value={ev.title}>
-                      {ev.title} ({ev.type === 'devoir' ? 'Devoir' : 'Interro'} - {ev.date})
-                    </option>
-                  ))}
-                </select>
+                  <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
+                  <span className="whitespace-nowrap truncate">Toutes les évaluations (Moyenne générale)</span>
+                </div>
               </div>
             </div>
 
-            {!subjectStats.hasData ? (
-              /* ÉTAT VIDE COMPACT ET PARFAITEMENT ADAPTÉ AU MOBILE */
-              <div className="bg-slate-50/80 rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-dashed border-slate-200 text-center flex flex-col items-center justify-center gap-2.5 max-w-lg mx-auto w-full shadow-2xs">
-                <div className="w-12 h-12 rounded-2xl bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 mb-1">
-                  <BookOpen size={22} className="text-slate-400" />
-                </div>
-                <div className="w-full">
-                  <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm">
-                    Aucune note enregistrée pour le moment
-                  </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-500 max-w-xs sm:max-w-md mx-auto mt-1 leading-relaxed px-2 break-words">
-                    Il n'y a pas encore d'évaluations ou d'interrogations saisies en <span className="font-bold text-slate-700">{selectedSubjectName}</span> pour la classe <span className="font-bold text-slate-700">{selectedClass?.name}</span> au {activeTrimester}.
-                  </p>
-                </div>
-                {onNavigate && (
-                  <button
-                    onClick={() => onNavigate('dashboard')}
-                    className="mt-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
-                  >
-                    <span>Aller au Tableau de bord pour saisir des notes</span>
-                    <span>→</span>
-                  </button>
-                )}
-              </div>
-            ) : (
-              <>
+
                 {/* 3. TABLEAU DE BORD STATISTIQUE - CARTES INDICATEURS CLÉS (Section 3) */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                   {/* Carte 1 : Moyenne Générale */}
@@ -1453,29 +1495,39 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                         Moyenne Classe
                       </span>
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                        subjectStats.classAverage >= referenceThreshold 
+                        subjectStats.hasData && subjectStats.classAverage >= referenceThreshold 
                           ? 'bg-emerald-50 text-emerald-600' 
-                          : 'bg-rose-50 text-rose-600'
+                          : 'bg-rose-50 text-rose-500'
                       }`}>
                         <Award size={18} />
                       </div>
                     </div>
                     <div className="mt-2">
                       <div className="text-2xl md:text-3xl font-black text-slate-900">
-                        {subjectStats.classAverage} 
-                        <span className="text-xs md:text-sm font-semibold text-slate-400"> /20</span>
+                        {subjectStats.hasData ? (
+                          <>
+                            {subjectStats.classAverage} 
+                            <span className="text-xs md:text-sm font-semibold text-slate-400"> /20</span>
+                          </>
+                        ) : (
+                          <span className="text-slate-400 font-bold">—</span>
+                        )}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-                        {subjectStats.classAverage >= referenceThreshold ? (
-                          <span className="text-emerald-600 font-bold flex items-center">
-                            <TrendingUp size={12} className="mr-0.5" />
-                            +{(subjectStats.classAverage - referenceThreshold).toFixed(2)} pts vs réf
-                          </span>
+                        {subjectStats.hasData ? (
+                          subjectStats.classAverage >= referenceThreshold ? (
+                            <span className="text-emerald-600 font-bold flex items-center">
+                              <TrendingUp size={12} className="mr-0.5" />
+                              +{(subjectStats.classAverage - referenceThreshold).toFixed(2)} pts vs réf
+                            </span>
+                          ) : (
+                            <span className="text-rose-600 font-bold flex items-center">
+                              <TrendingDown size={12} className="mr-0.5" />
+                              {(subjectStats.classAverage - referenceThreshold).toFixed(2)} pts vs réf
+                            </span>
+                          )
                         ) : (
-                          <span className="text-rose-600 font-bold flex items-center">
-                            <TrendingDown size={12} className="mr-0.5" />
-                            {(subjectStats.classAverage - referenceThreshold).toFixed(2)} pts vs réf
-                          </span>
+                          <span className="text-slate-500">Aucune note saisie</span>
                         )}
                       </div>
                     </div>
@@ -1518,10 +1570,14 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                     </div>
                     <div className="mt-2">
                       <div className="text-2xl md:text-3xl font-black text-slate-900">
-                        {subjectStats.successRate}%
+                        {subjectStats.hasData ? `${subjectStats.successRate}%` : <span className="text-slate-900 font-black">—</span>}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1">
-                        <span>{aboveAverageStudents.length + equalAverageStudents.length} élèves ≥ {referenceThreshold}/20</span>
+                        {subjectStats.hasData ? (
+                          <span>{aboveAverageStudents.length + equalAverageStudents.length} élèves ≥ {referenceThreshold}/20</span>
+                        ) : (
+                          <span className="text-slate-500">En attente de notes</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1538,11 +1594,15 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                     </div>
                     <div className="mt-2">
                       <div className="text-sm font-bold text-slate-800 flex items-center justify-between">
-                        <span className="text-emerald-600">Max : {subjectStats.bestScore}/20</span>
-                        <span className="text-rose-600">Min : {subjectStats.lowestScore}/20</span>
+                        <span className="text-emerald-600">
+                          Max : {subjectStats.hasData ? `${subjectStats.bestScore}/20` : '—'}
+                        </span>
+                        <span className="text-rose-600">
+                          Min : {subjectStats.hasData ? `${subjectStats.lowestScore}/20` : '—'}
+                        </span>
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1">
-                        Étendue de la classe : <span className="font-bold text-slate-800">{subjectStats.spread} pts</span>
+                        Étendue de la classe : <span className="font-bold text-slate-800">{subjectStats.hasData ? `${subjectStats.spread} pts` : '—'}</span>
                       </div>
                     </div>
                   </div>
@@ -1554,7 +1614,6 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                       <Filter size={14} className="text-sky-500" /> Répartition et analyse des 3 catégories
                     </h3>
-                    <span className="text-xs text-slate-400">Cliquez sur une catégorie pour filtrer</span>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1653,7 +1712,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                 </div>
 
                 {/* 6. GRAPHIQUES DÉTAILLÉS ET PROFESSIONNELS (Section 6) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {subjectStats.hasData && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   {/* GRAPHIQUE 1 : Évolution de la moyenne de la classe au fil des interrogations */}
                   <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col">
                     <div className="flex items-center justify-between mb-3">
@@ -1809,8 +1869,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                     </div>
                   </div>
                 </div>
-              </>
-            )}
+              )}
 
             {/* 7. ANALYSE DE PROGRESSION DE LA CLASSE (Section 7) */}
             {progressionComparison && (
@@ -2152,8 +2211,9 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                   if (isGeneralOrClassList) {
                     const studentGeneralAvg = getStudentGeneralAverage(inspectedStudent);
                     const studentRankItem = enrichedTerminaleStudents.find(item => String(item.student.id) === String(inspectedStudent.id));
-                    const studentRank = studentRankItem ? studentRankItem.rank : '—';
-                    const isPassing = studentGeneralAvg >= referenceThreshold;
+                    const hasRealAvg = studentGeneralAvg !== null && studentGeneralAvg > 0;
+                    const studentRank = studentRankItem && studentRankItem.hasRealAverage ? studentRankItem.rankDisplay : '—';
+                    const isPassing = hasRealAvg && studentGeneralAvg >= referenceThreshold;
 
                     return (
                       <>
@@ -2161,21 +2221,21 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                         <div className="grid grid-cols-2 gap-3">
                           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
                             <div className="text-[10px] font-bold uppercase text-slate-400">Moyenne Générale</div>
-                            <div className={`text-2xl font-black mt-1 ${isPassing ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {studentGeneralAvg > 0 ? `${studentGeneralAvg.toFixed(2)}/20` : '—'}
+                            <div className={`text-2xl font-black mt-1 ${hasRealAvg ? (isPassing ? 'text-emerald-600' : 'text-rose-600') : 'text-slate-400'}`}>
+                              {hasRealAvg ? `${studentGeneralAvg!.toFixed(2)}/20` : '—'}
                             </div>
                             <div className="text-[10px] text-slate-500 mt-0.5">
-                              {isPassing ? 'Admis au trimestre' : 'Sous la moyenne'}
+                              {hasRealAvg ? (isPassing ? 'Admis au trimestre' : 'Sous la moyenne') : 'Non encore évalué'}
                             </div>
                           </div>
 
                           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
                             <div className="text-[10px] font-bold uppercase text-slate-400">Classement</div>
                             <div className="text-2xl font-black mt-1 text-slate-800">
-                              #{studentRank} <span className="text-xs text-slate-400 font-semibold">/ {classStudents.length}</span>
+                              {studentRank !== '—' ? `#${studentRank}` : '—'} {studentRank !== '—' && <span className="text-xs text-slate-400 font-semibold">/ {enrichedTerminaleStudents.filter(s => s.hasRealAverage).length}</span>}
                             </div>
                             <div className="text-[10px] text-slate-500 mt-0.5">
-                              Moy. classe : {classOverallAvg}/20
+                              Moy. classe : {classOverallAvg !== '—' ? `${classOverallAvg}/20` : '—'}
                             </div>
                           </div>
                         </div>

@@ -22,7 +22,8 @@ const SUBJECT_HEX_COLORS: Record<string, string> = {
   'Étude': '#14b8a6',
   'EDHC': '#f97316',
   'Sciences et Technologies': '#10b981',
-  'Sciences et Technologies (notions de base)': '#10b981'
+  'Sciences et Technologies (notions de base)': '#10b981',
+  'Conduite': '#16a34a'
 };
 
 export const mockTeachers: Teacher[] = [];
@@ -102,15 +103,15 @@ const generateBulkStudents = (count: number): Student[] => {
           }));
       } else {
           baseSubjects = [
-            { name: 'Informatique', value: 15, average: 13.5, fill: '#64748b' },
-            { name: 'Physique-Chimie', value: 15, average: 12.8, fill: '#fbbf24' },
-            { name: 'SVT', value: 15, average: 13.2, fill: '#4ade80' },
-            { name: 'Philosophie', value: 15, average: 11.5, fill: '#7c3aed' },
-            { name: 'Mathématiques', value: 20, average: 12.0, fill: '#3b82f6' },
-            { name: 'Français', value: 15, average: 12.5, fill: '#a855f7' },
-            { name: 'Anglais', value: 10, average: 13.0, fill: '#f43f5e' },
-            { name: 'Hist-Géo', value: 10, average: 12.0, fill: '#22d3ee' },
-            { name: 'EPS', value: 10, average: 15.0, fill: '#f472b6' }
+            { name: 'Informatique', value: 15, average: 0, fill: '#64748b' },
+            { name: 'Physique-Chimie', value: 15, average: 0, fill: '#fbbf24' },
+            { name: 'SVT', value: 15, average: 0, fill: '#4ade80' },
+            { name: 'Philosophie', value: 15, average: 0, fill: '#7c3aed' },
+            { name: 'Mathématiques', value: 20, average: 0, fill: '#3b82f6' },
+            { name: 'Français', value: 15, average: 0, fill: '#a855f7' },
+            { name: 'Anglais', value: 10, average: 0, fill: '#f43f5e' },
+            { name: 'Hist-Géo', value: 10, average: 0, fill: '#22d3ee' },
+            { name: 'EPS', value: 10, average: 0, fill: '#f472b6' }
           ];
       }
 

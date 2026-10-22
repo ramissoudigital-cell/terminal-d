@@ -85,6 +85,7 @@ const DEFAULT_SUBJECTS: SubjectConfig[] = [
   { name: 'EPS', color: 'from-pink-500 to-rose-600', bgLight: 'bg-pink-50', textColor: 'text-pink-600', borderColor: 'border-pink-200' },
   { name: 'EDHC', color: 'from-orange-500 to-amber-600', bgLight: 'bg-orange-50', textColor: 'text-orange-600', borderColor: 'border-orange-200' },
   { name: 'Informatique', color: 'from-teal-500 to-cyan-600', bgLight: 'bg-teal-50', textColor: 'text-teal-600', borderColor: 'border-teal-200' },
+  { name: 'Conduite', color: 'from-emerald-600 to-teal-700', bgLight: 'bg-emerald-50', textColor: 'text-emerald-700', borderColor: 'border-emerald-300' },
 ];
 
 const COLOR_THEMES = [

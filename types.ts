@@ -276,7 +276,8 @@ export function getSubjectsForClass(className: string): string[] {
     'Français',
     'Anglais',
     'Hist-Géo',
-    'EPS'
+    'EPS',
+    'Conduite'
   ];
 }
 

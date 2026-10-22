@@ -38,7 +38,8 @@ const SUBJECTS_LIST = [
   'EPS',
   'Philosophie',
   'Allemand',
-  'Espagnol'
+  'Espagnol',
+  'Conduite'
 ];
 
 interface ResponsablesUPPageProps {

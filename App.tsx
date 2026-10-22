@@ -37,6 +37,7 @@ import {
   preRegisterUserByAdmin,
   logoutUserAccount
 } from './src/services/firebaseService';
+import { initAccreditationRealtimeSync } from './src/utils/accreditationUtils';
 
 const MOBILE_EXCLUDED_PAGES = [
   'communication',
@@ -90,6 +91,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    initAccreditationRealtimeSync();
     const handleLock = () => {
       if (localStorage.getItem('app_pin')) {
         localStorage.setItem('app_is_locked', 'true');
@@ -218,8 +220,27 @@ const App: React.FC = () => {
 
   const [teachers, setTeachers] = useState<Teacher[]>(() => {
       const savedTeachers = localStorage.getItem('school_db_teachers');
+      const deletedIds: string[] = (() => {
+        try { return JSON.parse(localStorage.getItem('deleted_teacher_ids') || '[]'); } catch { return []; }
+      })();
       if (savedTeachers) {
-          return JSON.parse(savedTeachers);
+          try {
+            const parsed = JSON.parse(savedTeachers);
+            if (Array.isArray(parsed)) {
+              return parsed.filter((t: any) => {
+                const tId = String(t.id || '');
+                const tUid = String(t.uid || t.authUid || '');
+                const tMat = String(t.matricule || '').toLowerCase().trim();
+                const tEmail = String(t.email || '').toLowerCase().trim();
+                return (
+                  !deletedIds.includes(tId) &&
+                  (!tUid || !deletedIds.includes(tUid)) &&
+                  (!tMat || (!deletedIds.includes(tMat) && !deletedIds.includes(`prof-${tMat}`))) &&
+                  (!tEmail || !deletedIds.includes(tEmail))
+                );
+              });
+            }
+          } catch (e) {}
       }
       return mockTeachers;
   });
@@ -235,19 +256,57 @@ const App: React.FC = () => {
         }
       });
 
+      // Subscribe to real-time deleted_teachers in system_metadata collection
+      const unsubscribeDeletedTeachers = subscribeToRealtimeCollection('system_metadata', (remoteMeta: any[]) => {
+        const deletedDoc = remoteMeta.find(d => d.id === 'deleted_teachers');
+        if (deletedDoc && Array.isArray(deletedDoc.ids)) {
+          try {
+            const currentDeleted: string[] = JSON.parse(localStorage.getItem('deleted_teacher_ids') || '[]');
+            const merged = Array.from(new Set([...currentDeleted, ...deletedDoc.ids]));
+            localStorage.setItem('deleted_teacher_ids', JSON.stringify(merged));
+            setTeachers(prev => prev.filter(t => {
+              const tId = String(t.id || '');
+              const tUid = String(t.uid || t.authUid || '');
+              const tMat = String(t.matricule || '').toLowerCase().trim();
+              const tEmail = String(t.email || '').toLowerCase().trim();
+              return (
+                !merged.includes(tId) &&
+                (!tUid || !merged.includes(tUid)) &&
+                (!tMat || (!merged.includes(tMat) && !merged.includes(`prof-${tMat}`))) &&
+                (!tEmail || !merged.includes(tEmail))
+              );
+            }));
+          } catch (e) {}
+        }
+      });
+
       // Subscribe to real-time teachers collection in Firestore
       const unsubscribeTeachers = subscribeToRealtimeCollection('teachers', (remoteTeachers) => {
         if (remoteTeachers && remoteTeachers.length > 0) {
           const deletedIds: string[] = (() => {
             try { return JSON.parse(localStorage.getItem('deleted_teacher_ids') || '[]'); } catch { return []; }
           })();
+          const isDeletedItem = (item: any) => {
+            if (!item) return true;
+            const tId = String(item.id || '');
+            const tUid = String(item.uid || item.authUid || '');
+            const tMat = String(item.matricule || '').toLowerCase().trim();
+            const tEmail = String(item.email || '').toLowerCase().trim();
+            return (
+              deletedIds.includes(tId) ||
+              (tUid && deletedIds.includes(tUid)) ||
+              (tMat && (deletedIds.includes(tMat) || deletedIds.includes(`prof-${tMat}`))) ||
+              (tEmail && deletedIds.includes(tEmail))
+            );
+          };
+
           setTeachers(prev => {
             const map = new Map<string, Teacher>();
-            prev.filter(t => !deletedIds.includes(String(t.id))).forEach(t => map.set(String(t.id), t));
+            prev.filter(t => !isDeletedItem(t)).forEach(t => map.set(String(t.id), t));
             (remoteTeachers as Teacher[])
-              .filter(rt => !deletedIds.includes(String(rt.id)))
+              .filter(rt => !isDeletedItem(rt))
               .forEach(rt => map.set(String(rt.id), { ...(map.get(String(rt.id)) || {}), ...rt }));
-            const merged = Array.from(map.values());
+            const merged = Array.from(map.values()).filter(t => !isDeletedItem(t));
             try {
               localStorage.setItem('school_db_teachers', JSON.stringify(merged));
             } catch (e) {}
@@ -262,14 +321,31 @@ const App: React.FC = () => {
           const deletedIds: string[] = (() => {
             try { return JSON.parse(localStorage.getItem('deleted_teacher_ids') || '[]'); } catch { return []; }
           })();
-          const teacherUsers = remoteUsers.filter(u => u.role === 'teacher' || u.accessLevel === 3);
+          const isDeletedUser = (u: any) => {
+            if (!u || u.isDeleted === true) return true;
+            const uId = String(u.id || '');
+            const uUid = String(u.uid || u.authUid || '');
+            const uMat = String(u.matricule || '').toLowerCase().trim();
+            const uEmail = String(u.email || '').toLowerCase().trim();
+            return (
+              deletedIds.includes(uId) ||
+              (uUid && deletedIds.includes(uUid)) ||
+              (uMat && (deletedIds.includes(uMat) || deletedIds.includes(`prof-${uMat}`))) ||
+              (uEmail && deletedIds.includes(uEmail))
+            );
+          };
+
+          const teacherUsers = remoteUsers.filter(u => (u.role === 'teacher' || u.accessLevel === 3) && !isDeletedUser(u));
           if (teacherUsers.length > 0) {
             setTeachers(prev => {
               const map = new Map<string, Teacher>();
-              prev.filter(t => !deletedIds.includes(String(t.id))).forEach(t => map.set(String(t.id), t));
+              prev.filter(t => !isDeletedUser(t)).forEach(t => map.set(String(t.id), t));
               teacherUsers.forEach(u => {
+                const uEmail = (u.email || '').toLowerCase().trim();
+                const uMat = (u.matricule || '').toLowerCase().trim();
                 const tId = u.matricule ? `PROF-${u.matricule}` : (u.id || `PROF-${u.authUid || Date.now()}`);
-                if (!deletedIds.includes(String(tId))) {
+
+                if (!isDeletedUser(u) && !deletedIds.includes(String(tId))) {
                   const teacherObj: Teacher = {
                     id: tId,
                     name: u.name || 'Enseignant',
@@ -286,10 +362,19 @@ const App: React.FC = () => {
                     uid: u.id,
                     authUid: u.id
                   };
-                  map.set(String(tId), { ...(map.get(String(tId)) || {}), ...teacherObj });
+                  // Existing teacher card in map (with recent edits) takes priority over stale user profile!
+                  const existing = map.get(String(tId)) || Array.from(map.values()).find(t => 
+                    (uEmail && t.email && t.email.toLowerCase().trim() === uEmail) ||
+                    (uMat && t.matricule && t.matricule.toLowerCase().trim() === uMat)
+                  );
+                  if (existing) {
+                    map.set(String(existing.id), { ...teacherObj, ...existing });
+                  } else {
+                    map.set(String(tId), teacherObj);
+                  }
                 }
               });
-              const merged = Array.from(map.values());
+              const merged = Array.from(map.values()).filter(t => !isDeletedUser(t));
               try {
                 localStorage.setItem('school_db_teachers', JSON.stringify(merged));
               } catch (e) {}

@@ -163,6 +163,14 @@ const getSubjectTheme = (subject: string) => {
     bar: 'bg-emerald-600',
     light: 'bg-emerald-100/70 text-emerald-800'
   };
+  if (s.includes('conduite')) return { 
+    color: 'text-emerald-800', 
+    bg: 'bg-emerald-50', 
+    border: 'border-emerald-300', 
+    badge: 'bg-emerald-600', 
+    bar: 'bg-emerald-600',
+    light: 'bg-emerald-100/80 text-emerald-900'
+  };
   return { 
     color: 'text-slate-700', 
     bg: 'bg-slate-50', 
@@ -493,27 +501,6 @@ export const StudentSuppliesModal: React.FC<StudentSuppliesModalProps> = ({
               >
                 <X size={18} className="sm:w-5 sm:h-5" />
               </button>
-            </div>
-          </div>
-
-          {/* Global Progress Bar Bar (Always Visible at top of modal) */}
-          <div className="bg-sky-50/70 border-b border-sky-100/80 px-4 sm:px-6 py-2.5 shrink-0 flex flex-col gap-1.5">
-            <div className="flex justify-between items-center text-xs font-black text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <Award size={15} className="text-sky-600" />
-                <span>Progression des exercices</span>
-              </span>
-              <span className="text-sky-700 font-black">
-                {acquiredCount} / {totalCount} validés ({progressPercent}%)
-              </span>
-            </div>
-            <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden">
-              <motion.div
-                className="bg-gradient-to-r from-sky-500 to-sky-600 h-full rounded-full"
-                initial={false}
-                animate={{ width: `${progressPercent}%` }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-              />
             </div>
           </div>
 
@@ -1026,33 +1013,43 @@ export const StudentSuppliesModal: React.FC<StudentSuppliesModalProps> = ({
             </AnimatePresence>
           </div>
 
-          {/* Bottom Banner Actions */}
-          <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
-            {selectedSubject ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedSubject(null);
-                  setShowAddForm(false);
-                }}
-                className="flex items-center gap-1.5 text-xs font-black text-sky-700 hover:text-sky-800 bg-white border border-slate-200 px-3.5 py-2 rounded-xl shadow-2xs hover:bg-sky-50 transition-colors"
-              >
-                <ArrowLeft size={14} />
-                <span>Voir toutes les matières</span>
-              </button>
-            ) : (
-              <div className="text-[11px] font-bold text-slate-500">
-                <span>Cliquez sur une matière pour voir ses exercices et joindre vos photos.</span>
+          {/* Slim Progress Bar at the very bottom */}
+          <div className="p-3 bg-slate-50 border-t border-slate-200/80 flex flex-col gap-2 shrink-0">
+            {selectedSubject && (
+              <div className="flex items-center justify-start">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedSubject(null);
+                    setShowAddForm(false);
+                  }}
+                  className="flex items-center gap-1.5 text-xs font-black text-sky-700 hover:text-sky-800 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs hover:bg-sky-50 transition-colors"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Voir toutes les matières</span>
+                </button>
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-xs font-black text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 px-4 py-2 rounded-xl transition-colors shadow-2xs"
-            >
-              Fermer
-            </button>
+            <div className="bg-sky-50/70 border border-sky-100/80 px-3 py-2 rounded-xl flex flex-col gap-1">
+              <div className="flex justify-between items-center text-[11px] font-bold text-slate-700">
+                <span className="flex items-center gap-1">
+                  <Award size={13} className="text-sky-600" />
+                  <span>Progression globale</span>
+                </span>
+                <span className="text-sky-700 font-extrabold">
+                  {acquiredCount} / {totalCount} validés ({progressPercent}%)
+                </span>
+              </div>
+              <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden">
+                <motion.div
+                  className="bg-gradient-to-r from-sky-500 to-sky-600 h-full rounded-full"
+                  initial={false}
+                  animate={{ width: `${progressPercent}%` }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                />
+              </div>
+            </div>
           </div>
         </motion.div>
       </div>

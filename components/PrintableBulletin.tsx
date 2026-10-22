@@ -516,7 +516,7 @@ export const PrintableBulletin: React.FC<PrintableBulletinProps> = ({
                   const oralCoef = Math.max(1, Math.round(coef / 4));
 
                   return (
-                    <React.Fragment key={sub.name}>
+                    <React.Fragment key={`lettre-francais-${idx}`}>
                       {/* Main Français Row */}
                       <tr className="border-b border-black">
                         <td className="border border-black p-1 font-bold">Français</td>
@@ -559,7 +559,7 @@ export const PrintableBulletin: React.FC<PrintableBulletinProps> = ({
                 }
 
                 return (
-                  <tr key={sub.name} className={`border-b border-black ${sub.inactive ? "opacity-40 grayscale" : ""}`}>
+                  <tr key={`lettre-${sub.name}-${idx}`} className={`border-b border-black ${sub.inactive ? "opacity-40 grayscale" : ""}`}>
                     <td className="border border-black p-1 font-bold">{sub.name}</td>
                     <td className="border border-black p-1 text-center font-bold">{fmtNum(sub.average || 0)}</td>
                     <td className="border border-black p-1 text-center">{coef}</td>
@@ -588,7 +588,7 @@ export const PrintableBulletin: React.FC<PrintableBulletinProps> = ({
                 const moyCoef = (sub.average || 0) * coef;
                 const subRang = Math.max(1, Math.min(totalClassSize, Math.round(studentRank + (idx % 2))));
                 return (
-                  <tr key={sub.name} className={`border-b border-black ${sub.inactive ? "opacity-40 grayscale" : ""}`}>
+                  <tr key={`science-${sub.name}-${idx}`} className={`border-b border-black ${sub.inactive ? "opacity-40 grayscale" : ""}`}>
                     <td className="border border-black p-1 font-bold">{sub.name}</td>
                     <td className="border border-black p-1 text-center font-bold">{fmtNum(sub.average || 0)}</td>
                     <td className="border border-black p-1 text-center">{coef}</td>
@@ -612,11 +612,11 @@ export const PrintableBulletin: React.FC<PrintableBulletinProps> = ({
               )}
 
               {/* AUTRES SUBJECTS */}
-              {autresSubjects.map((sub) => {
+              {autresSubjects.map((sub, idx) => {
                 const coef = getSubjectCoef(student.class, sub.name);
                 const moyCoef = (sub.average || 0) * coef;
                 return (
-                  <tr key={sub.name} className={`border-b border-black ${sub.inactive ? "opacity-40 grayscale" : ""}`}>
+                  <tr key={`autre-${sub.name}-${idx}`} className={`border-b border-black ${sub.inactive ? "opacity-40 grayscale" : ""}`}>
                     <td className="border border-black p-1 font-bold">{sub.name}</td>
                     <td className="border border-black p-1 text-center font-bold">{fmtNum(sub.average || 0)}</td>
                     <td className="border border-black p-1 text-center">{coef > 0 ? coef : ''}</td>

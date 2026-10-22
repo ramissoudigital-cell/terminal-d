@@ -66,10 +66,6 @@ export default function Home({ onNavigate }: HomeProps) {
           </div>
         </div>
 
-        {/* Live Game side tab */}
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-28 bg-brand-purple-light rounded-l-[1.5rem] flex items-center justify-center shadow-[-5px_0_15px_rgba(0,0,0,0.1)]">
-          <span className="-rotate-90 text-[10px] font-bold text-white tracking-widest whitespace-nowrap">En direct</span>
-        </div>
       </div>
 
       {/* News Section */}

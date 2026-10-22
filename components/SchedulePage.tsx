@@ -69,6 +69,7 @@ export const getTeacherForSubject = (subject: string, teachersList?: any[], clas
     'Françals': { name: 'Mr.LAGBO', photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80' },
     'Devoir': { name: 'Surveillant Général', photo: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?auto=format&fit=crop&w=150&q=80', email: 'surveillance@ecole.edu' },
     'Étude': { name: 'Surveillant Général', photo: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?auto=format&fit=crop&w=150&q=80', email: 'surveillance@ecole.edu' },
+    'Conduite': { name: 'Professeur de Conduite', photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80', email: 'conduite@ecole.edu' },
   };
 
   return fallbackMap[subject] || { name: 'Professeur de ' + subject, photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80' };
@@ -167,7 +168,7 @@ const SUBJECTS = [
     'Mathématiques', 'Français', 'Anglais', 'Hist-Géo', 'SVT', 
     'Physique-Chimie', 'EPS', 'Philosophie', 'Informatique', 'Espagnol', 
     'Allemand', 'Arts Plastiques', 'Musique', 'Devoir',
-    'Histoire', 'Géographie', 'EDHC', 'Sciences et Technologies', 'Éducation Musicale', 'Sciences et Technologies (notions de base)'
+    'Histoire', 'Géographie', 'EDHC', 'Sciences et Technologies', 'Éducation Musicale', 'Sciences et Technologies (notions de base)', 'Conduite'
 ];
 
 const ROOMS = [
@@ -201,6 +202,7 @@ const getSubjectColor = (subject: string): string => {
         case 'Éducation Musicale':
             return 'bg-violet-100 border-violet-200 text-violet-700';
         case 'EDHC': return 'bg-teal-100 border-teal-200 text-teal-700';
+        case 'Conduite': return 'bg-emerald-100 border-emerald-200 text-emerald-800';
         case 'Devoir':
         case 'Devoirs':
             return 'bg-rose-100 border-rose-300 text-rose-700';

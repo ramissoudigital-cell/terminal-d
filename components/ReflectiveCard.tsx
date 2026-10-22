@@ -583,6 +583,7 @@ export interface ReflectiveCardProps {
   idLabel?: string;
   idValue?: React.ReactNode;
   bottomBadge?: React.ReactNode;
+  gender?: string;
   avatar?: string;
   onAvatarClick?: () => void;
   children?: React.ReactNode;
@@ -622,6 +623,7 @@ const ReflectiveCard: React.FC<ReflectiveCardProps> = ({
   idLabel = 'ID number',
   idValue = '8901 2345 6789',
   bottomBadge,
+  gender,
   avatar,
   onAvatarClick,
   children,
@@ -1118,7 +1120,16 @@ const ReflectiveCard: React.FC<ReflectiveCardProps> = ({
                 )}
                 <div className="reflective-card__info min-w-0 flex-1">
                   {name && <h3 className="reflective-card__name">{name}</h3>}
-                  {role && <p className="reflective-card__role">{role}</p>}
+                  {role && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="reflective-card__role">{role}</p>
+                      {gender && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-100/90 text-blue-800 border border-blue-200 shrink-0">
+                          {gender}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               {(idLabel || idValue || bottomBadge) && (

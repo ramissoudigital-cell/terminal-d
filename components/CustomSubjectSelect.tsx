@@ -18,12 +18,13 @@ import {
   Music, 
   Scale, 
   TrendingUp, 
-  Sparkles 
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 
 export interface SubjectConfig {
   name: string;
-  category: 'Sciences' | 'Lettres' | 'Langues' | 'Arts & Sport' | 'Général';
+  category: 'Sciences' | 'Lettres' | 'Langues' | 'Arts & Sport' | 'Vie Scolaire' | 'Général';
   icon: React.ComponentType<{ className?: string; size?: number }>;
   color: string;
   colorEnd: string;
@@ -33,7 +34,7 @@ export interface SubjectConfig {
 }
 
 export const SUBJECT_METADATA: Record<string, {
-  category: 'Sciences' | 'Lettres' | 'Langues' | 'Arts & Sport' | 'Général';
+  category: 'Sciences' | 'Lettres' | 'Langues' | 'Arts & Sport' | 'Vie Scolaire' | 'Général';
   icon: React.ComponentType<{ className?: string; size?: number }>;
   color: string;
   colorEnd: string;
@@ -122,68 +123,14 @@ export const SUBJECT_METADATA: Record<string, {
     gradient: 'from-sky-500 to-blue-700',
     bgLight: 'bg-sky-50 text-sky-700 border-sky-200'
   },
-  'Espagnol': {
-    category: 'Langues',
-    icon: Languages,
-    color: '#ea580c',
-    colorEnd: '#c2410c',
-    bgGradient: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
-    gradient: 'from-orange-500 to-amber-600',
-    bgLight: 'bg-orange-50 text-orange-700 border-orange-200'
-  },
-  'Allemand': {
-    category: 'Langues',
-    icon: Languages,
-    color: '#475569',
-    colorEnd: '#334155',
-    bgGradient: 'linear-gradient(135deg, #475569 0%, #1e293b 100%)',
-    gradient: 'from-slate-600 to-slate-800',
-    bgLight: 'bg-slate-100 text-slate-700 border-slate-200'
-  },
-  'Arts Plastiques': {
-    category: 'Arts & Sport',
-    icon: Palette,
-    color: '#ec4899',
-    colorEnd: '#be185d',
-    bgGradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
-    gradient: 'from-fuchsia-500 to-pink-600',
-    bgLight: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200'
-  },
-  'Musique': {
-    category: 'Arts & Sport',
-    icon: Music,
-    color: '#4f46e5',
-    colorEnd: '#4338ca',
-    bgGradient: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
-    gradient: 'from-indigo-500 to-blue-600',
-    bgLight: 'bg-indigo-50 text-indigo-700 border-indigo-200'
-  },
-  'EDHC': {
-    category: 'Général',
-    icon: Sparkles,
-    color: '#f97316',
-    colorEnd: '#ea580c',
-    bgGradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-    gradient: 'from-orange-500 to-red-500',
-    bgLight: 'bg-orange-50 text-orange-700 border-orange-200'
-  },
-  'Économie Générale': {
-    category: 'Général',
-    icon: TrendingUp,
-    color: '#0284c7',
-    colorEnd: '#1d4ed8',
-    bgGradient: 'linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%)',
-    gradient: 'from-sky-500 to-blue-600',
-    bgLight: 'bg-sky-50 text-sky-700 border-sky-200'
-  },
-  'Droit': {
-    category: 'Général',
-    icon: Scale,
-    color: '#0d9488',
-    colorEnd: '#0f766e',
-    bgGradient: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
-    gradient: 'from-teal-500 to-emerald-600',
-    bgLight: 'bg-teal-50 text-teal-700 border-teal-200'
+  'Conduite': {
+    category: 'Vie Scolaire',
+    icon: ShieldCheck,
+    color: '#059669',
+    colorEnd: '#047857',
+    bgGradient: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+    gradient: 'from-emerald-600 to-teal-700',
+    bgLight: 'bg-emerald-50 text-emerald-800 border-emerald-200'
   }
 };
 
@@ -223,8 +170,29 @@ export const CustomSubjectSelect: React.FC<CustomSubjectSelectProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
+  const [dropPosition, setDropPosition] = useState<'down' | 'up'>('down');
+  const [dropdownMaxHeight, setDropdownMaxHeight] = useState<number>(360);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Viewport-aware position detection (dropup vs dropdown)
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom - 16;
+      const spaceAbove = rect.top - 16;
+
+      if (spaceBelow < 280 && spaceAbove > spaceBelow) {
+        setDropPosition('up');
+        setDropdownMaxHeight(Math.min(380, Math.max(220, spaceAbove - 12)));
+      } else {
+        setDropPosition('down');
+        setDropdownMaxHeight(Math.min(380, Math.max(220, spaceBelow - 12)));
+      }
+    }
+  }, [isOpen]);
 
   // Close on outside click or Escape
   useEffect(() => {
@@ -245,7 +213,13 @@ export const CustomSubjectSelect: React.FC<CustomSubjectSelectProps> = ({
       document.addEventListener('keydown', handleKeyDown);
       setTimeout(() => {
         searchInputRef.current?.focus();
-      }, 50);
+        if (listRef.current) {
+          const selectedEl = listRef.current.querySelector('[data-selected="true"]');
+          if (selectedEl) {
+            selectedEl.scrollIntoView({ block: 'nearest' });
+          }
+        }
+      }, 60);
     }
 
     return () => {
@@ -264,6 +238,15 @@ export const CustomSubjectSelect: React.FC<CustomSubjectSelectProps> = ({
       cats.add(meta.category);
     });
     return ['Tous', ...Array.from(cats)];
+  }, [subjects]);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { Tous: subjects.length };
+    subjects.forEach(s => {
+      const cat = getSubjectMeta(s).category;
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
   }, [subjects]);
 
   const filteredSubjects = useMemo(() => {
@@ -332,14 +315,17 @@ export const CustomSubjectSelect: React.FC<CustomSubjectSelectProps> = ({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            initial={{ opacity: 0, y: dropPosition === 'up' ? 6 : -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            exit={{ opacity: 0, y: dropPosition === 'up' ? 6 : -6, scale: 0.98 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute left-0 right-0 z-50 mt-2 p-2.5 bg-white/95 backdrop-blur-2xl rounded-[24px] border border-slate-200/90 shadow-[0_20px_50px_-10px_rgba(15,23,42,0.22)] overflow-hidden flex flex-col max-h-[380px]"
+            style={{ maxHeight: `${dropdownMaxHeight}px` }}
+            className={`absolute left-0 right-0 z-50 p-2.5 bg-white/98 backdrop-blur-2xl rounded-[24px] border border-slate-200/90 shadow-[0_20px_50px_-10px_rgba(15,23,42,0.22)] flex flex-col ${
+              dropPosition === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
+            }`}
           >
             {/* Header: Search Box */}
-            <div className="relative mb-2">
+            <div className="relative mb-2 shrink-0">
               <Search
                 size={15}
                 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
@@ -364,28 +350,35 @@ export const CustomSubjectSelect: React.FC<CustomSubjectSelectProps> = ({
             </div>
 
             {/* Category Filter Pills */}
-            <div className="flex items-center gap-1.5 pb-2 border-b border-slate-100 overflow-x-auto no-scrollbar mb-1 px-0.5">
+            <div className="flex items-center gap-1.5 pb-2 border-b border-slate-100 overflow-x-auto no-scrollbar mb-1 px-0.5 shrink-0">
               {categories.map((cat, idx) => {
                 const isActive = selectedCategory === cat;
+                const count = categoryCounts[cat] || 0;
                 return (
                   <button
                     key={`cat-${cat}-${idx}`}
                     type="button"
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold tracking-tight whitespace-nowrap transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold tracking-tight whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 ${
                       isActive
                         ? 'bg-slate-900 text-white shadow-sm'
                         : 'bg-slate-100/70 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`}
                   >
-                    {cat}
+                    <span>{cat}</span>
+                    <span className={`text-[10px] ${isActive ? 'text-slate-300' : 'text-slate-400'}`}>
+                      ({count})
+                    </span>
                   </button>
                 );
               })}
             </div>
 
             {/* Subjects List Scrollable Area */}
-            <div className="overflow-y-auto flex-1 pr-1 space-y-1 custom-scrollbar max-h-[240px]">
+            <div 
+              ref={listRef}
+              className="overflow-y-auto flex-1 pr-1 pb-2 space-y-1 custom-scrollbar min-h-[120px]"
+            >
               {filteredSubjects.length === 0 ? (
                 <div className="py-8 text-center text-slate-400">
                   <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
@@ -393,82 +386,93 @@ export const CustomSubjectSelect: React.FC<CustomSubjectSelectProps> = ({
                   <p className="text-[10px] text-slate-400 mt-0.5">Essayez avec un autre mot-clé</p>
                 </div>
               ) : (
-                filteredSubjects.map((sub, idx) => {
-                  const isSelected = sub === value;
-                  const meta = getSubjectMeta(sub);
-                  const Icon = meta.icon;
+                <>
+                  {filteredSubjects.map((sub, idx) => {
+                    const isSelected = sub === value;
+                    const meta = getSubjectMeta(sub);
+                    const Icon = meta.icon;
 
-                  return (
-                    <button
-                      key={`subj-${sub}-${idx}`}
-                      type="button"
-                      onClick={() => handleSelect(sub)}
-                      className={`w-full flex items-center justify-between p-2 rounded-xl transition-all text-left cursor-pointer group ${
-                        isSelected
-                          ? 'bg-sky-50/90 text-sky-950 font-bold border border-sky-200/80 shadow-xs'
-                          : 'hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-medium'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {/* Icon badge */}
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
-                          style={
-                            isSelected
-                              ? {
-                                  background: meta.bgGradient,
-                                  backgroundColor: meta.color,
-                                  color: '#ffffff',
-                                  boxShadow: `0 3px 10px ${meta.color}45`
-                                }
-                              : {
-                                  backgroundColor: `${meta.color}18`,
-                                  color: meta.color,
-                                  border: `1px solid ${meta.color}25`
-                                }
-                          }
-                        >
-                          <Icon size={16} className={isSelected ? 'text-white drop-shadow-xs' : ''} />
-                        </div>
-
-                        <div className="flex flex-col min-w-0">
-                          <span
-                            className={`text-[13px] truncate ${
-                              isSelected ? 'font-bold text-sky-950' : 'text-slate-800'
-                            }`}
+                    return (
+                      <button
+                        key={`subj-${sub}-${idx}`}
+                        type="button"
+                        data-selected={isSelected}
+                        onClick={() => handleSelect(sub)}
+                        className={`w-full flex items-center justify-between p-2 rounded-xl transition-all text-left cursor-pointer group ${
+                          isSelected
+                            ? 'bg-sky-50/90 text-sky-950 font-bold border border-sky-200/80 shadow-xs'
+                            : 'hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-medium'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {/* Icon badge */}
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+                            style={
+                              isSelected
+                                ? {
+                                    background: meta.bgGradient,
+                                    backgroundColor: meta.color,
+                                    color: '#ffffff',
+                                    boxShadow: `0 3px 10px ${meta.color}45`
+                                  }
+                                : {
+                                    backgroundColor: `${meta.color}18`,
+                                    color: meta.color,
+                                    border: `1px solid ${meta.color}25`
+                                  }
+                            }
                           >
-                            {sub}
-                          </span>
-                          <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
-                            <span
-                              className="w-1.5 h-1.5 rounded-full inline-block"
-                              style={{ backgroundColor: meta.color }}
-                            />
-                            {meta.category}
-                          </span>
-                        </div>
-                      </div>
+                            <Icon size={16} className={isSelected ? 'text-white drop-shadow-xs' : ''} />
+                          </div>
 
-                      {/* Right Checkmark */}
-                      {isSelected ? (
-                        <div className="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-xs shrink-0">
-                          <Check size={14} strokeWidth={2.8} />
+                          <div className="flex flex-col min-w-0">
+                            <span
+                              className={`text-[13px] truncate ${
+                                isSelected ? 'font-bold text-sky-950' : 'text-slate-800'
+                              }`}
+                            >
+                              {sub}
+                            </span>
+                            <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
+                              <span
+                                className="w-1.5 h-1.5 rounded-full inline-block"
+                                style={{ backgroundColor: meta.color }}
+                              />
+                              {meta.category}
+                            </span>
+                          </div>
                         </div>
-                      ) : (
-                        <span className="text-[11px] font-mono font-semibold text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity pr-1">
-                          Choisir
-                        </span>
-                      )}
-                    </button>
-                  );
-                })
+
+                        {/* Right Checkmark */}
+                        {isSelected ? (
+                          <div className="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-xs shrink-0">
+                            <Check size={14} strokeWidth={2.8} />
+                          </div>
+                        ) : (
+                          <span className="text-[11px] font-mono font-semibold text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity pr-1">
+                            Choisir
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+
+                  {/* End of list confirmation indicator */}
+                  <div className="pt-2 pb-1 text-center">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100/90 text-[10px] font-semibold text-slate-500 border border-slate-200/50">
+                      <Check size={11} className="text-emerald-600" />
+                      <span>Fin de liste • {subjects.length} matières au programme</span>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
             {/* Bottom Footer Info */}
-            <div className="pt-2 mt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400 font-medium px-1">
-              <span>{filteredSubjects.length} matière{filteredSubjects.length > 1 ? 's' : ''}</span>
-              <span className="text-sky-600 font-semibold">Programme national</span>
+            <div className="pt-2 mt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400 font-medium px-1 shrink-0 bg-white/70">
+              <span>{filteredSubjects.length} matière{filteredSubjects.length > 1 ? 's' : ''} affichée{filteredSubjects.length > 1 ? 's' : ''}</span>
+              <span className="text-sky-600 font-semibold">Programme officiel Terminale D</span>
             </div>
           </motion.div>
         )}

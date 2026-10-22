@@ -124,7 +124,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
       niveau5: localStorage.getItem('acc_niv5') || 'DIR-2024'
   });
 
-  const [selectedSubjectToEdit, setSelectedSubjectToEdit] = useState<string>(teacherUserSubject);
+  const [selectedSubjectToEdit, setSelectedSubjectToEdit] = useState<string>(() => {
+    if (ALL_TEACHING_SUBJECTS.includes(teacherUserSubject)) {
+      return teacherUserSubject;
+    }
+    return ALL_TEACHING_SUBJECTS[0] || 'Mathématiques';
+  });
   const [subjectCodes, setSubjectCodes] = useState<Record<string, string>>(() => getAllSubjectAccreditationCodes());
   const [editingCodeValue, setEditingCodeValue] = useState<string>(() => {
     if (isTeacherRole && !isDirector) {
@@ -184,6 +189,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
         { id: currentUser?.id, email: currentUser?.email, subject: teacherUserSubject },
         formatted
       );
+      if (teacherUserSubject) {
+        setSubjectAccreditationCode(teacherUserSubject, formatted);
+      }
       setEditingCodeValue(formatted);
 
       if (currentUser && onUpdateUser) {
@@ -269,6 +277,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
         { id: currentUser?.id, email: currentUser?.email, subject: teacherUserSubject },
         defaultCode
       );
+      if (teacherUserSubject) {
+        setSubjectAccreditationCode(teacherUserSubject, defaultCode);
+      }
       setEditingCodeValue(defaultCode);
       if (currentUser && onUpdateUser) {
         onUpdateUser({
@@ -534,7 +545,31 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
                 </div>
             </details>
 
-            <div className="mt-8 flex justify-end gap-4">
+            <div className="mt-8 flex justify-between gap-4">
+                <button 
+                    onClick={() => {
+                      const dataToExport = {
+                        profile: currentUser,
+                        studentData: userRoleStr === 'student' || userRoleStr === 'eleve' || userRoleStr === 'élève' 
+                          ? allStudents?.find(s => s.id === currentUser?.id || s.studentId === currentUser?.matricule)
+                          : undefined
+                      };
+                      
+                      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToExport, null, 2));
+                      const downloadAnchorNode = document.createElement('a');
+                      downloadAnchorNode.setAttribute("href", dataStr);
+                      downloadAnchorNode.setAttribute("download", `mes_donnees_${currentUser?.name || 'utilisateur'}.json`);
+                      document.body.appendChild(downloadAnchorNode);
+                      downloadAnchorNode.click();
+                      downloadAnchorNode.remove();
+                      setToastMessage("Données exportées avec succès !");
+                      setShowToast(true);
+                      setTimeout(() => setShowToast(false), 3000);
+                    }}
+                    className="px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all text-sm"
+                >
+                    Exporter mes données
+                </button>
                 <button 
                     onClick={handleSaveProfile}
                     className="px-8 py-3 bg-[#0ea5e9] text-white font-bold rounded-xl shadow-lg shadow-sky-200 hover:bg-sky-600 transition-all text-sm"
@@ -727,6 +762,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
         );
 
 
+      case 'appearance':
+        return (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                <h2 className="text-xl font-bold text-gray-800 mb-6">Apparence</h2>
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <ToggleItem 
+                        title="Mode Nuit" 
+                        description="Activer le thème sombre pour une meilleure visibilité nocturne."
+                        icon={darkMode ? <Moon size={20} className="text-indigo-400" /> : <Sun size={20} className="text-amber-500" />}
+                        active={darkMode}
+                        onToggle={() => setDarkMode(!darkMode)}
+                    />
+                </div>
+            </div>
+        );
       case 'about':
         return (
             <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-8">
@@ -1342,6 +1392,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
                     label="À propos de l'application" 
                     active={activeTab === 'about'}
                     onClick={() => setActiveTab('about')}
+                />
+                 <SettingsItem 
+                    icon={<Palette size={18} />} 
+                    label="Apparence" 
+                    active={activeTab === 'appearance'}
+                    onClick={() => setActiveTab('appearance')}
                 />
                 <div className="hidden md:block w-full h-px bg-gray-100 my-2"></div>
                 <button 
