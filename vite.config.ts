@@ -30,8 +30,8 @@ export default defineConfig(({ mode }) => {
             description: 'Application de gestion scolaire et tableau de bord Terminale D',
             theme_color: '#BFDBFE',
             background_color: '#BFDBFE',
-            display: 'fullscreen',
-            display_override: ['fullscreen', 'standalone'],
+            display: 'standalone',
+            display_override: ['standalone', 'minimal-ui'],
             icons: [
               {
                 src: '/icone.png',
@@ -49,10 +49,6 @@ export default defineConfig(({ mode }) => {
           }
         })
       ],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
       optimizeDeps: {
         entries: ['index.html'],
         exclude: ['@capgo/capacitor-native-biometric'],

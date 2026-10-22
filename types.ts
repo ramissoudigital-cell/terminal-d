@@ -173,6 +173,9 @@ export interface User {
   childrenCount?: number;
   children?: ParentChild[];
   directorType?: 'Directeur des Études' | 'Directeur Exécutif' | string;
+  isPrincipal?: boolean;
+  isProfesseurPrincipal?: boolean;
+  principalClasses?: string[];
 }
 
 export interface MediaDocument {
@@ -264,6 +267,7 @@ export function getSubjectsForClass(className: string): string[] {
   }
 
   return [
+    'Devoir',
     'Informatique',
     'Physique-Chimie',
     'SVT',

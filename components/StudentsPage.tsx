@@ -797,7 +797,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
       <div className="pt-4 md:pt-6 pb-4 px-4 md:px-8 shrink-0 flex flex-col gap-3">
         {/* Navigation & Titre */}
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
             {onNavigate && (
               <button 
                 onClick={() => onNavigate('dashboard')}
@@ -807,16 +807,16 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                 <ArrowLeft size={20} />
               </button>
             )}
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h1 className="text-white text-2xl md:text-[28px] font-bold tracking-tight">
+                <h1 className="text-white text-2xl md:text-[28px] font-bold tracking-tight truncate">
                   Statistiques
                 </h1>
-                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm shrink-0">
                   <Sparkles size={12} /> Live
                 </span>
               </div>
-              <p className="text-white/80 text-xs md:text-sm mt-0.5">
+              <p className="text-white/80 text-xs md:text-sm mt-0.5 truncate">
                 {selectedClass ? `${selectedClass.name} • ${totalEnrolled} élèves` : "Analyse des performances et progression scolaire"}
               </p>
             </div>
@@ -962,15 +962,15 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
             {/* En-tête de la liste de classe */}
             <div className="bg-gradient-to-r from-emerald-50 via-teal-50/50 to-slate-50 p-5 md:p-6 rounded-3xl border border-emerald-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="p-2.5 rounded-2xl bg-emerald-500 text-white shadow-md shadow-emerald-500/20">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="p-2.5 rounded-2xl bg-emerald-500 text-white shadow-md shadow-emerald-500/20 shrink-0">
                     <Users size={22} />
                   </span>
-                  <div>
-                    <h2 className="text-lg md:text-xl font-black text-slate-900 flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-lg md:text-xl font-black text-slate-900 flex items-center gap-2 truncate">
                       Liste de classe • Terminale D
                     </h2>
-                    <p className="text-slate-600 text-xs md:text-sm mt-0.5">
+                    <p className="text-slate-600 text-xs md:text-sm mt-0.5 truncate">
                       Relevé général nominatif des {enrichedTerminaleStudents.length} élèves avec leurs moyennes et leurs notes par matière au {activeTrimester}.
                     </p>
                   </div>
@@ -978,17 +978,17 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
               </div>
 
               {/* Statistiques rapides de la classe */}
-              <div className="flex items-center flex-wrap gap-2.5">
+              <div className="flex items-center flex-wrap gap-2.5 shrink-0">
                 <div className="bg-white px-3.5 py-2 rounded-2xl border border-slate-100 shadow-2xs text-center min-w-[75px]">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Élèves</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">Élèves</div>
                   <div className="text-base md:text-lg font-black text-slate-800">{enrichedTerminaleStudents.length}</div>
                 </div>
                 <div className="bg-white px-3.5 py-2 rounded-2xl border border-slate-100 shadow-2xs text-center min-w-[95px]">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Moyenne Classe</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">Moyenne Classe</div>
                   <div className="text-base md:text-lg font-black text-emerald-600">{classOverallAvg}/20</div>
                 </div>
                 <div className="bg-white px-3.5 py-2 rounded-2xl border border-slate-100 shadow-2xs text-center min-w-[85px]">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Taux Réussite</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">Taux Réussite</div>
                   <div className="text-base md:text-lg font-black text-sky-600">{classPassRate}%</div>
                 </div>
               </div>
@@ -1244,18 +1244,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
             </div>
 
             {/* GRAPHIQUE 5 : COMPARAISON ENTRE TOUTES LES MATIÈRES */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    <BarChart2 className="text-sky-600" size={18} />
-                    Comparaison des moyennes par matière
+            <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+                    <BarChart2 className="text-sky-600 shrink-0" size={18} />
+                    <span>Comparaison des moyennes par matière</span>
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug">
                     Moyenne sur 20 calculée à partir des notes réelles de la classe.
                   </p>
                 </div>
-                <span className="text-xs font-semibold text-slate-400">Ligne repère : {referenceThreshold}/20</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-100 self-start sm:self-auto shrink-0 shadow-2xs">
+                  Ligne repère : <strong className="text-slate-800">{referenceThreshold}/20</strong>
+                </span>
               </div>
 
               {allSubjectsOverview.some(s => s.average !== null) ? (
@@ -1416,407 +1418,398 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
               </div>
             </div>
 
-            {/* 3. TABLEAU DE BORD STATISTIQUE - CARTES INDICATEURS CLÉS (Section 3) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-              {/* Carte 1 : Moyenne Générale */}
-              <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    Moyenne Classe
-                  </span>
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                    subjectStats.hasData && subjectStats.classAverage >= referenceThreshold 
-                      ? 'bg-emerald-50 text-emerald-600' 
-                      : 'bg-rose-50 text-rose-600'
-                  }`}>
-                    <Award size={18} />
-                  </div>
+            {!subjectStats.hasData ? (
+              /* ÉTAT VIDE COMPACT ET PARFAITEMENT ADAPTÉ AU MOBILE */
+              <div className="bg-slate-50/80 rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-dashed border-slate-200 text-center flex flex-col items-center justify-center gap-2.5 max-w-lg mx-auto w-full shadow-2xs">
+                <div className="w-12 h-12 rounded-2xl bg-white shadow-2xs border border-slate-100 flex items-center justify-center text-slate-400 mb-1">
+                  <BookOpen size={22} className="text-slate-400" />
                 </div>
-                <div className="mt-2">
-                  <div className="text-2xl md:text-3xl font-black text-slate-900">
-                    {subjectStats.hasData ? (
-                      <>
+                <div className="w-full">
+                  <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm">
+                    Aucune note enregistrée pour le moment
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-500 max-w-xs sm:max-w-md mx-auto mt-1 leading-relaxed px-2 break-words">
+                    Il n'y a pas encore d'évaluations ou d'interrogations saisies en <span className="font-bold text-slate-700">{selectedSubjectName}</span> pour la classe <span className="font-bold text-slate-700">{selectedClass?.name}</span> au {activeTrimester}.
+                  </p>
+                </div>
+                {onNavigate && (
+                  <button
+                    onClick={() => onNavigate('dashboard')}
+                    className="mt-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
+                  >
+                    <span>Aller au Tableau de bord pour saisir des notes</span>
+                    <span>→</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* 3. TABLEAU DE BORD STATISTIQUE - CARTES INDICATEURS CLÉS (Section 3) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                  {/* Carte 1 : Moyenne Générale */}
+                  <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Moyenne Classe
+                      </span>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                        subjectStats.classAverage >= referenceThreshold 
+                          ? 'bg-emerald-50 text-emerald-600' 
+                          : 'bg-rose-50 text-rose-600'
+                      }`}>
+                        <Award size={18} />
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <div className="text-2xl md:text-3xl font-black text-slate-900">
                         {subjectStats.classAverage} 
                         <span className="text-xs md:text-sm font-semibold text-slate-400"> /20</span>
-                      </>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                        {subjectStats.classAverage >= referenceThreshold ? (
+                          <span className="text-emerald-600 font-bold flex items-center">
+                            <TrendingUp size={12} className="mr-0.5" />
+                            +{(subjectStats.classAverage - referenceThreshold).toFixed(2)} pts vs réf
+                          </span>
+                        ) : (
+                          <span className="text-rose-600 font-bold flex items-center">
+                            <TrendingDown size={12} className="mr-0.5" />
+                            {(subjectStats.classAverage - referenceThreshold).toFixed(2)} pts vs réf
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Carte 2 : Effectif Inscrits & Notés */}
+                  <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Élèves Évalués
+                      </span>
+                      <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                        <Users size={18} />
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <div className="text-2xl md:text-3xl font-black text-slate-900">
+                        {evaluatedCount} 
+                        <span className="text-xs md:text-sm font-semibold text-slate-400"> / {totalEnrolled}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        {unevaluatedCount > 0 ? (
+                          <span className="text-amber-600 font-semibold">{unevaluatedCount} élève(s) sans note</span>
+                        ) : (
+                          <span className="text-emerald-600 font-semibold">100% de la classe évaluée</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Carte 3 : Taux de Réussite */}
+                  <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Taux de Réussite
+                      </span>
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <CheckCircle2 size={18} />
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <div className="text-2xl md:text-3xl font-black text-slate-900">
+                        {subjectStats.successRate}%
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        <span>{aboveAverageStudents.length + equalAverageStudents.length} élèves ≥ {referenceThreshold}/20</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Carte 4 : Meilleure & Pire Note */}
+                  <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Extrêmes & Écart
+                      </span>
+                      <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <BarChart2 size={18} />
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <div className="text-sm font-bold text-slate-800 flex items-center justify-between">
+                        <span className="text-emerald-600">Max : {subjectStats.bestScore}/20</span>
+                        <span className="text-rose-600">Min : {subjectStats.lowestScore}/20</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        Étendue de la classe : <span className="font-bold text-slate-800">{subjectStats.spread} pts</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. LES 3 CATÉGORIES D'ÉLÈVES CLIQUABLES (Section 4) */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <Filter size={14} className="text-sky-500" /> Répartition et analyse des 3 catégories
+                    </h3>
+                    <span className="text-xs text-slate-400">Cliquez sur une catégorie pour filtrer</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Catégorie 1 : Sous la moyenne */}
+                    <button
+                      onClick={() => setActiveCategoryFilter(activeCategoryFilter === 'under' ? 'all' : 'under')}
+                      className={`p-4 rounded-3xl border transition-all text-left cursor-pointer flex flex-col justify-between ${
+                        activeCategoryFilter === 'under'
+                          ? 'border-rose-500 bg-rose-50/90 shadow-md ring-2 ring-rose-300'
+                          : 'border-rose-100 bg-rose-50/30 hover:bg-rose-50/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-rose-700 uppercase">Sous la moyenne</span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                      </div>
+                      <div className="mt-3">
+                        <div className="text-2xl font-black text-rose-700">
+                          {underAverageStudents.length}
+                        </div>
+                        <div className="text-[11px] font-semibold text-rose-600/80 mt-0.5">
+                          {evaluatedCount > 0 ? `${((underAverageStudents.length / evaluatedCount) * 100).toFixed(1)}% des notés` : '0%'}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Catégorie 2 : À la moyenne */}
+                    <button
+                      onClick={() => setActiveCategoryFilter(activeCategoryFilter === 'equal' ? 'all' : 'equal')}
+                      className={`p-4 rounded-3xl border transition-all text-left cursor-pointer flex flex-col justify-between ${
+                        activeCategoryFilter === 'equal'
+                          ? 'border-amber-500 bg-amber-50/90 shadow-md ring-2 ring-amber-300'
+                          : 'border-amber-100 bg-amber-50/30 hover:bg-amber-50/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-amber-700 uppercase">À la moyenne</span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      </div>
+                      <div className="mt-3">
+                        <div className="text-2xl font-black text-amber-700">
+                          {equalAverageStudents.length}
+                        </div>
+                        <div className="text-[11px] font-semibold text-amber-600/80 mt-0.5">
+                          {evaluatedCount > 0 ? `${((equalAverageStudents.length / evaluatedCount) * 100).toFixed(1)}% des notés` : '0%'}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Catégorie 3 : Au-dessus de la moyenne */}
+                    <button
+                      onClick={() => setActiveCategoryFilter(activeCategoryFilter === 'above' ? 'all' : 'above')}
+                      className={`p-4 rounded-3xl border transition-all text-left cursor-pointer flex flex-col justify-between ${
+                        activeCategoryFilter === 'above'
+                          ? 'border-emerald-500 bg-emerald-50/90 shadow-md ring-2 ring-emerald-300'
+                          : 'border-emerald-100 bg-emerald-50/30 hover:bg-emerald-50/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-emerald-700 uppercase">Au-dessus moyenne</span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      </div>
+                      <div className="mt-3">
+                        <div className="text-2xl font-black text-emerald-700">
+                          {aboveAverageStudents.length}
+                        </div>
+                        <div className="text-[11px] font-semibold text-emerald-600/80 mt-0.5">
+                          {evaluatedCount > 0 ? `${((aboveAverageStudents.length / evaluatedCount) * 100).toFixed(1)}% des notés` : '0%'}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Catégorie Sans note */}
+                    <button
+                      onClick={() => setActiveCategoryFilter(activeCategoryFilter === 'unevaluated' ? 'all' : 'unevaluated')}
+                      className={`p-4 rounded-3xl border transition-all text-left cursor-pointer flex flex-col justify-between ${
+                        activeCategoryFilter === 'unevaluated'
+                          ? 'border-slate-500 bg-slate-100 shadow-md ring-2 ring-slate-300'
+                          : 'border-slate-100 bg-slate-50 hover:bg-slate-100/70'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-600 uppercase">Sans note</span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+                      </div>
+                      <div className="mt-3">
+                        <div className="text-2xl font-black text-slate-700">
+                          {unevaluatedCount}
+                        </div>
+                        <div className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                          {totalEnrolled > 0 ? `${((unevaluatedCount / totalEnrolled) * 100).toFixed(1)}% de la classe` : '0%'}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 6. GRAPHIQUES DÉTAILLÉS ET PROFESSIONNELS (Section 6) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {/* GRAPHIQUE 1 : Évolution de la moyenne de la classe au fil des interrogations */}
+                  <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                          <LineChartIcon size={16} className="text-sky-600" />
+                          Évolution de la moyenne au fil des interrogations
+                        </h4>
+                        <p className="text-xs text-slate-400">Progression globale de la classe</p>
+                      </div>
+                      <span className="text-xs font-semibold text-rose-500">Seuil 10/20</span>
+                    </div>
+
+                    {evolutionChartData.length > 0 ? (
+                      <div className="w-full h-[240px] pt-2">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={evolutionChartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="shortName" tick={{ fontSize: 11, fill: '#64748b' }} />
+                            <YAxis domain={[0, 20]} tick={{ fontSize: 11, fill: '#64748b' }} />
+                            <Tooltip 
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const d = payload[0].payload;
+                                  return (
+                                    <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-1">
+                                      <div className="font-bold text-sky-400">{d.name}</div>
+                                      <div>Date : {d.date}</div>
+                                      <div>Moyenne : <span className="font-bold">{d.average}/20</span></div>
+                                      <div>Taux de réussite : <span className="font-bold">{d.successRate}%</span></div>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <ReferenceLine y={referenceThreshold} stroke="#f43f5e" strokeDasharray="4 4" />
+                            <Line 
+                              type="monotone" 
+                              dataKey="average" 
+                              stroke="#0284c7" 
+                              strokeWidth={3} 
+                              dot={{ fill: '#0284c7', r: 5 }} 
+                              activeDot={{ r: 7 }} 
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
                     ) : (
-                      <span className="text-slate-300 text-xl font-bold">—</span>
+                      <div className="h-[200px] flex items-center justify-center text-xs text-slate-400 italic">
+                        Une seule évaluation enregistrée : l'historique d'évolution s'affichera à partir de la 2ᵉ évaluation.
+                      </div>
                     )}
                   </div>
-                  <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-                    {subjectStats.hasData ? (
-                      subjectStats.classAverage >= referenceThreshold ? (
-                        <span className="text-emerald-600 font-bold flex items-center">
-                          <TrendingUp size={12} className="mr-0.5" />
-                          +{(subjectStats.classAverage - referenceThreshold).toFixed(2)} pts vs réf
-                        </span>
-                      ) : (
-                        <span className="text-rose-600 font-bold flex items-center">
-                          <TrendingDown size={12} className="mr-0.5" />
-                          {(subjectStats.classAverage - referenceThreshold).toFixed(2)} pts vs réf
-                        </span>
-                      )
-                    ) : (
-                      <span>Aucune note saisie</span>
-                    )}
-                  </div>
-                </div>
-              </div>
 
-              {/* Carte 2 : Effectif Inscrits & Notés */}
-              <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    Élèves Évalués
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                    <Users size={18} />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl md:text-3xl font-black text-slate-900">
-                    {evaluatedCount} 
-                    <span className="text-xs md:text-sm font-semibold text-slate-400"> / {totalEnrolled}</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    {unevaluatedCount > 0 ? (
-                      <span className="text-amber-600 font-semibold">{unevaluatedCount} élève(s) sans note</span>
-                    ) : (
-                      <span className="text-emerald-600 font-semibold">100% de la classe évaluée</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Carte 3 : Taux de Réussite */}
-              <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    Taux de Réussite
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <CheckCircle2 size={18} />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl md:text-3xl font-black text-slate-900">
-                    {subjectStats.hasData ? `${subjectStats.successRate}%` : '—'}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    {subjectStats.hasData ? (
-                      <span>{aboveAverageStudents.length + equalAverageStudents.length} élèves ≥ {referenceThreshold}/20</span>
-                    ) : (
-                      <span>En attente de notes</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Carte 4 : Meilleure & Pire Note */}
-              <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    Extrêmes & Écart
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                    <BarChart2 size={18} />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-sm font-bold text-slate-800 flex items-center justify-between">
-                    <span className="text-emerald-600">Max : {subjectStats.hasData ? `${subjectStats.bestScore}/20` : '—'}</span>
-                    <span className="text-rose-600">Min : {subjectStats.hasData ? `${subjectStats.lowestScore}/20` : '—'}</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    Étendue de la classe : <span className="font-bold text-slate-800">{subjectStats.hasData ? `${subjectStats.spread} pts` : '—'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 4. LES 3 CATÉGORIES D'ÉLÈVES CLIQUABLES (Section 4) */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <Filter size={14} className="text-sky-500" /> Répartition et analyse des 3 catégories
-                </h3>
-                <span className="text-xs text-slate-400">Cliquez sur une catégorie pour filtrer</span>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/* Catégorie 1 : Sous la moyenne */}
-                <button
-                  onClick={() => setActiveCategoryFilter(activeCategoryFilter === 'under' ? 'all' : 'under')}
-                  className={`p-4 rounded-3xl border transition-all text-left cursor-pointer flex flex-col justify-between ${
-                    activeCategoryFilter === 'under'
-                      ? 'border-rose-500 bg-rose-50/90 shadow-md ring-2 ring-rose-300'
-                      : 'border-rose-100 bg-rose-50/30 hover:bg-rose-50/60'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-rose-700 uppercase">Sous la moyenne</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                  </div>
-                  <div className="mt-3">
-                    <div className="text-2xl font-black text-rose-700">
-                      {underAverageStudents.length}
+                  {/* GRAPHIQUE 2 : Répartition des élèves (3 catégories) */}
+                  <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                          <PieChartIcon size={16} className="text-sky-600" />
+                          Répartition des élèves par catégorie
+                        </h4>
+                        <p className="text-xs text-slate-400">Proportions parmi les {evaluatedCount} élèves évalués</p>
+                      </div>
                     </div>
-                    <div className="text-[11px] font-semibold text-rose-600/80 mt-0.5">
-                      {evaluatedCount > 0 ? `${((underAverageStudents.length / evaluatedCount) * 100).toFixed(1)}% des notés` : '0%'}
-                    </div>
-                  </div>
-                </button>
 
-                {/* Catégorie 2 : À la moyenne (Strictement séparée !) */}
-                <button
-                  onClick={() => setActiveCategoryFilter(activeCategoryFilter === 'equal' ? 'all' : 'equal')}
-                  className={`p-4 rounded-3xl border transition-all text-left cursor-pointer flex flex-col justify-between ${
-                    activeCategoryFilter === 'equal'
-                      ? 'border-amber-500 bg-amber-50/90 shadow-md ring-2 ring-amber-300'
-                      : 'border-amber-100 bg-amber-50/30 hover:bg-amber-50/60'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-amber-700 uppercase">À la moyenne</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  </div>
-                  <div className="mt-3">
-                    <div className="text-2xl font-black text-amber-700">
-                      {equalAverageStudents.length}
-                    </div>
-                    <div className="text-[11px] font-semibold text-amber-600/80 mt-0.5">
-                      {evaluatedCount > 0 ? `${((equalAverageStudents.length / evaluatedCount) * 100).toFixed(1)}% des notés` : '0%'}
-                    </div>
-                  </div>
-                </button>
-
-                {/* Catégorie 3 : Au-dessus de la moyenne */}
-                <button
-                  onClick={() => setActiveCategoryFilter(activeCategoryFilter === 'above' ? 'all' : 'above')}
-                  className={`p-4 rounded-3xl border transition-all text-left cursor-pointer flex flex-col justify-between ${
-                    activeCategoryFilter === 'above'
-                      ? 'border-emerald-500 bg-emerald-50/90 shadow-md ring-2 ring-emerald-300'
-                      : 'border-emerald-100 bg-emerald-50/30 hover:bg-emerald-50/60'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-emerald-700 uppercase">Au-dessus moyenne</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                  </div>
-                  <div className="mt-3">
-                    <div className="text-2xl font-black text-emerald-700">
-                      {aboveAverageStudents.length}
-                    </div>
-                    <div className="text-[11px] font-semibold text-emerald-600/80 mt-0.5">
-                      {evaluatedCount > 0 ? `${((aboveAverageStudents.length / evaluatedCount) * 100).toFixed(1)}% des notés` : '0%'}
-                    </div>
-                  </div>
-                </button>
-
-                {/* Catégorie Sans note */}
-                <button
-                  onClick={() => setActiveCategoryFilter(activeCategoryFilter === 'unevaluated' ? 'all' : 'unevaluated')}
-                  className={`p-4 rounded-3xl border transition-all text-left cursor-pointer flex flex-col justify-between ${
-                    activeCategoryFilter === 'unevaluated'
-                      ? 'border-slate-500 bg-slate-100 shadow-md ring-2 ring-slate-300'
-                      : 'border-slate-100 bg-slate-50 hover:bg-slate-100/70'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-600 uppercase">Sans note</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
-                  </div>
-                  <div className="mt-3">
-                    <div className="text-2xl font-black text-slate-700">
-                      {unevaluatedCount}
-                    </div>
-                    <div className="text-[11px] font-semibold text-slate-500 mt-0.5">
-                      {totalEnrolled > 0 ? `${((unevaluatedCount / totalEnrolled) * 100).toFixed(1)}% de la classe` : '0%'}
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* 6. GRAPHIQUES DÉTAILLÉS ET PROFESSIONNELS (Section 6) */}
-            {subjectStats.hasData ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* GRAPHIQUE 1 : Évolution de la moyenne de la classe au fil des interrogations */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                        <LineChartIcon size={16} className="text-sky-600" />
-                        Évolution de la moyenne au fil des interrogations
-                      </h4>
-                      <p className="text-xs text-slate-400">Progression globale de la classe</p>
-                    </div>
-                    <span className="text-xs font-semibold text-rose-500">Seuil 10/20</span>
-                  </div>
-
-                  {evolutionChartData.length > 0 ? (
-                    <div className="w-full h-[240px] pt-2">
+                    <div className="w-full h-[240px] flex items-center justify-center">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={evolutionChartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="shortName" tick={{ fontSize: 11, fill: '#64748b' }} />
-                          <YAxis domain={[0, 20]} tick={{ fontSize: 11, fill: '#64748b' }} />
+                        <PieChart>
+                          <Pie
+                            data={pieDistributionData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={85}
+                            paddingAngle={3}
+                            dataKey="value"
+                          >
+                            {pieDistributionData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
                           <Tooltip 
                             content={({ active, payload }) => {
                               if (active && payload && payload.length) {
                                 const d = payload[0].payload;
+                                const pct = evaluatedCount > 0 ? ((d.value / evaluatedCount) * 100).toFixed(1) : 0;
                                 return (
-                                  <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-1">
-                                    <div className="font-bold text-sky-400">{d.name}</div>
-                                    <div>Date : {d.date}</div>
-                                    <div>Moyenne : <span className="font-bold">{d.average}/20</span></div>
-                                    <div>Taux de réussite : <span className="font-bold">{d.successRate}%</span></div>
+                                  <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-0.5">
+                                    <div className="font-bold">{d.name}</div>
+                                    <div>Effectif : <span className="font-bold">{d.value} élève(s)</span> ({pct}%)</div>
                                   </div>
                                 );
                               }
                               return null;
                             }}
                           />
-                          <ReferenceLine y={referenceThreshold} stroke="#f43f5e" strokeDasharray="4 4" />
-                          <Line 
-                            type="monotone" 
-                            dataKey="average" 
-                            stroke="#0284c7" 
-                            strokeWidth={3} 
-                            dot={{ fill: '#0284c7', r: 5 }} 
-                            activeDot={{ r: 7 }} 
+                          <Legend 
+                            verticalAlign="bottom" 
+                            iconType="circle" 
+                            iconSize={8} 
+                            wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} 
                           />
-                        </LineChart>
+                        </PieChart>
                       </ResponsiveContainer>
                     </div>
-                  ) : (
-                    <div className="h-[200px] flex items-center justify-center text-xs text-slate-400 italic">
-                      Une seule évaluation enregistrée : l'historique d'évolution s'affichera à partir de la 2ᵉ évaluation.
+                  </div>
+
+                  {/* GRAPHIQUE 3 : Histogramme de distribution des notes par tranches */}
+                  <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col lg:col-span-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                          <BarChart2 size={16} className="text-sky-600" />
+                          Distribution des notes par tranches
+                        </h4>
+                        <p className="text-xs text-slate-400">
+                          Comprendre comment les notes sont ventilées à travers l'échelle de 0 à 20
+                        </p>
+                      </div>
+                      <span className="text-xs text-slate-400 font-medium">{evaluatedCount} élèves notés</span>
                     </div>
-                  )}
-                </div>
 
-                {/* GRAPHIQUE 2 : Répartition des élèves (3 catégories) */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                        <PieChartIcon size={16} className="text-sky-600" />
-                        Répartition des élèves par catégorie
-                      </h4>
-                      <p className="text-xs text-slate-400">Proportions parmi les {evaluatedCount} élèves évalués</p>
+                    <div className="w-full h-[230px] pt-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={distributionChartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="range" tick={{ fontSize: 11, fill: '#64748b' }} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                          <Tooltip 
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const d = payload[0].payload;
+                                return (
+                                  <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-1">
+                                    <div className="font-bold text-sky-400">Tranche : {d.range}</div>
+                                    <div>Nombre d'élèves : <span className="font-bold">{d.count}</span></div>
+                                    <div>Proportion : <span className="font-bold">{d.percentage}%</span></div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={34}>
+                            {distributionChartData.map((entry, index) => (
+                              <Cell key={`dist-${index}`} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   </div>
-
-                  <div className="w-full h-[240px] flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pieDistributionData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={85}
-                          paddingAngle={3}
-                          dataKey="value"
-                        >
-                          {pieDistributionData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              const d = payload[0].payload;
-                              const pct = evaluatedCount > 0 ? ((d.value / evaluatedCount) * 100).toFixed(1) : 0;
-                              return (
-                                <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-0.5">
-                                  <div className="font-bold">{d.name}</div>
-                                  <div>Effectif : <span className="font-bold">{d.value} élève(s)</span> ({pct}%)</div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Legend 
-                          verticalAlign="bottom" 
-                          iconType="circle" 
-                          iconSize={8} 
-                          wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} 
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
                 </div>
-
-                {/* GRAPHIQUE 3 : Histogramme de distribution des notes par tranches */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col lg:col-span-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                        <BarChart2 size={16} className="text-sky-600" />
-                        Distribution des notes par tranches
-                      </h4>
-                      <p className="text-xs text-slate-400">
-                        Comprendre comment les notes sont ventilées à travers l'échelle de 0 à 20
-                      </p>
-                    </div>
-                    <span className="text-xs text-slate-400 font-medium">{evaluatedCount} élèves notés</span>
-                  </div>
-
-                  <div className="w-full h-[230px] pt-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={distributionChartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="range" tick={{ fontSize: 11, fill: '#64748b' }} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                        <Tooltip 
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              const d = payload[0].payload;
-                              return (
-                                <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg text-xs space-y-1">
-                                  <div className="font-bold text-sky-400">Tranche : {d.range}</div>
-                                  <div>Nombre d'élèves : <span className="font-bold">{d.count}</span></div>
-                                  <div>Proportion : <span className="font-bold">{d.percentage}%</span></div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={34}>
-                          {distributionChartData.map((entry, index) => (
-                            <Cell key={`dist-${index}`} fill={entry.color} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* ÉTAT VIDE ÉLÉGANT SI AUCUNE NOTE */
-              <div className="bg-slate-50/60 rounded-3xl p-10 border border-dashed border-slate-200 text-center flex flex-col items-center justify-center gap-3">
-                <div className="w-16 h-16 rounded-2xl bg-white shadow-xs border border-slate-100 flex items-center justify-center text-slate-400">
-                  <BookOpen size={30} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-800 text-base">Aucune note enregistrée pour le moment</h3>
-                  <p className="text-xs text-slate-500 max-w-md mt-1">
-                    Il n'y a pas encore d'évaluations ou d'interrogations saisies en <span className="font-semibold text-slate-700">{selectedSubjectName}</span> pour la classe <span className="font-semibold text-slate-700">{selectedClass?.name}</span> au {activeTrimester}.
-                  </p>
-                </div>
-                {onNavigate && (
-                  <button
-                    onClick={() => onNavigate('dashboard')}
-                    className="mt-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
-                  >
-                    Aller au Tableau de bord pour saisir des notes
-                  </button>
-                )}
-              </div>
+              </>
             )}
 
             {/* 7. ANALYSE DE PROGRESSION DE LA CLASSE (Section 7) */}
@@ -1868,14 +1861,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                 <div>
                   <h3 className="font-bold text-slate-800 text-sm md:text-base flex items-center gap-2">
                     <Users size={18} className="text-sky-600" />
-                    Liste des élèves ({displayedStudents.length} affiché{displayedStudents.length > 1 ? 's' : ''})
+                    {!subjectStats.hasData ? (
+                      <span>Élèves de la classe ({displayedStudents.length})</span>
+                    ) : (
+                      <span>Liste des élèves ({displayedStudents.length} affiché{displayedStudents.length > 1 ? 's' : ''})</span>
+                    )}
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    {activeCategoryFilter === 'under' && 'Élèves ayant une note sous la moyenne (< 10/20)'}
-                    {activeCategoryFilter === 'equal' && 'Élèves ayant exactement la moyenne (10/20)'}
-                    {activeCategoryFilter === 'above' && 'Élèves ayant une note supérieure à la moyenne (> 10/20)'}
-                    {activeCategoryFilter === 'unevaluated' && 'Élèves sans note enregistrée pour cette sélection'}
-                    {activeCategoryFilter === 'all' && 'Tous les élèves de la classe'}
+                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
+                    {!subjectStats.hasData 
+                      ? `Élèves inscrits en ${selectedClass?.name} en attente d'évaluation en ${selectedSubjectName}`
+                      : activeCategoryFilter === 'under' ? 'Élèves ayant une note sous la moyenne (< 10/20)'
+                      : activeCategoryFilter === 'equal' ? 'Élèves ayant exactement la moyenne (10/20)'
+                      : activeCategoryFilter === 'above' ? 'Élèves ayant une note supérieure à la moyenne (> 10/20)'
+                      : activeCategoryFilter === 'unevaluated' ? 'Élèves sans note enregistrée pour cette sélection'
+                      : 'Tous les élèves de la classe'}
                   </p>
                 </div>
 
@@ -1989,7 +1988,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                                   )}
                                 </span>
                               ) : (
-                                <span className="text-slate-400 text-xs font-bold italic">Pas de note</span>
+                                <span className="text-slate-400 text-xs font-semibold">En attente de note</span>
                               )}
                             </div>
                           </div>

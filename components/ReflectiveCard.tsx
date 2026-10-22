@@ -3,6 +3,7 @@
 import React, { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CheckmarkBadge01Icon, FingerPrintIcon } from '@hugeicons/core-free-icons';
+import { Camera } from 'lucide-react';
 
 import './ReflectiveCard.css';
 
@@ -41,6 +42,18 @@ const THEMES = {
     '--rc-tile-highlight': 'rgba(255, 255, 255, 0.95)',
     '--rc-tile-shadow': '0 4px 10px -4px rgba(29, 78, 216, 0.2)',
     '--rc-rim': '#BFDBFE',
+    '--rc-rim-highlight': 'rgba(255, 255, 255, 0.95)'
+  },
+  purple: {
+    '--rc-base': '#d8b4fe',
+    '--rc-shadow': '0 22px 44px -20px rgba(124, 58, 237, 0.35), 0 0 24px rgba(195, 160, 255, 0.65)',
+    '--rc-ink': '#1e1b4b',
+    '--rc-muted': 'rgba(67, 56, 202, 0.85)',
+    '--rc-tile': 'linear-gradient(180deg, #ffffff 0%, #f3e8ff 100%)',
+    '--rc-tile-edge': '#c084fc',
+    '--rc-tile-highlight': 'rgba(255, 255, 255, 0.95)',
+    '--rc-tile-shadow': '0 4px 10px -4px rgba(124, 58, 237, 0.2)',
+    '--rc-rim': '#c084fc',
     '--rc-rim-highlight': 'rgba(255, 255, 255, 0.95)'
   }
 };
@@ -571,6 +584,7 @@ export interface ReflectiveCardProps {
   idValue?: React.ReactNode;
   bottomBadge?: React.ReactNode;
   avatar?: string;
+  onAvatarClick?: () => void;
   children?: React.ReactNode;
   videoSrc?: string;
   webcam?: boolean;
@@ -596,7 +610,7 @@ export interface ReflectiveCardProps {
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   extraBadge?: React.ReactNode;
   actions?: React.ReactNode;
-  theme?: 'dark' | 'light' | 'blue';
+  theme?: 'dark' | 'light' | 'blue' | 'purple';
 }
 
 const ReflectiveCard: React.FC<ReflectiveCardProps> = ({
@@ -609,6 +623,7 @@ const ReflectiveCard: React.FC<ReflectiveCardProps> = ({
   idValue = '8901 2345 6789',
   bottomBadge,
   avatar,
+  onAvatarClick,
   children,
   theme = 'blue',
   videoSrc,
@@ -645,7 +660,7 @@ const ReflectiveCard: React.FC<ReflectiveCardProps> = ({
   const errorRef = useRef(onWebcamError);
   const [generation, setGeneration] = useState(0);
 
-  const palette = theme === 'light' ? 'light' : theme === 'blue' ? 'blue' : 'dark';
+  const palette = theme === 'light' ? 'light' : theme === 'blue' ? 'blue' : theme === 'purple' ? 'purple' : 'dark';
   const settings = {
     tint: parseColor(tint).map(channel => Math.pow(channel, 2.2)),
     metalness: clamp(metalness, 0, 1),
@@ -1088,18 +1103,29 @@ const ReflectiveCard: React.FC<ReflectiveCardProps> = ({
               )}
               <div className="reflective-card__identity">
                 {avatar && (
-                  <div className="reflective-card__avatar">
+                  <div 
+                    className={`reflective-card__avatar ${onAvatarClick ? 'cursor-pointer relative group' : ''}`}
+                    onClick={onAvatarClick ? (e) => { e.stopPropagation(); onAvatarClick(); } : undefined}
+                    title={onAvatarClick ? 'Changer la photo' : undefined}
+                  >
                     <img src={avatar} alt={name} />
+                    {onAvatarClick && (
+                      <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-center">
+                        <Camera size={14} />
+                      </div>
+                    )}
                   </div>
                 )}
-                {name && <h3 className="reflective-card__name">{name}</h3>}
-                {role && <p className="reflective-card__role">{role}</p>}
+                <div className="reflective-card__info min-w-0 flex-1">
+                  {name && <h3 className="reflective-card__name">{name}</h3>}
+                  {role && <p className="reflective-card__role">{role}</p>}
+                </div>
               </div>
               {(idLabel || idValue || bottomBadge) && (
                 <div className="reflective-card__footer">
                   <div className="reflective-card__id">
-                    {idLabel && <span className="reflective-card__label">{idLabel}</span>}
-                    {idValue && <span className="reflective-card__value">{idValue}</span>}
+                    {idLabel && <span className="reflective-card__label truncate">{idLabel}</span>}
+                    {idValue && <div className="reflective-card__value truncate">{idValue}</div>}
                   </div>
                   {bottomBadge ? (
                     <div className="shrink-0">{bottomBadge}</div>

@@ -15,13 +15,17 @@ import {
   User as UserIcon,
   Sparkles,
   Save,
-  TrendingUp
+  TrendingUp,
+  Copy,
+  ShieldCheck,
+  CheckCircle2,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import PatternWaves from './PatternWaves';
 import ReflectiveCard from './ReflectiveCard';
 import { compressImage } from '../src/utils/userUtils';
-import { saveRealtimeDocument } from '../src/services/firebaseService';
+import { saveRealtimeDocument, deleteRealtimeDocument } from '../src/services/firebaseService';
 import { getSubjectCoef } from './TransactionList';
 
 interface CardDashboardProps {
@@ -30,6 +34,7 @@ interface CardDashboardProps {
   student?: any;
   onUpdateStudent?: (student: any) => void;
   onUpdateUser?: (user: any) => void;
+  onDeleteStudent?: (studentId: string) => void;
 }
 
 export default function CardDashboard({ 
@@ -37,7 +42,8 @@ export default function CardDashboard({
   currentUser,
   student,
   onUpdateStudent,
-  onUpdateUser
+  onUpdateUser,
+  onDeleteStudent
 }: CardDashboardProps) {
   // Récupération des informations scolaires de l'élève ou utilisateur
   const isTeacherUser = currentUser?.role === 'teacher' || currentUser?.accessLevel === 3;
@@ -52,7 +58,7 @@ export default function CardDashboard({
     isTeacherUser ? (currentUser?.matricule || currentUser?.id || 'PROF-001') : (student?.studentId || student?.matricule || currentUser?.matricule || '2024-TD1')
   );
   const [displayStatus, setDisplayStatus] = useState<string>(
-    isTeacherUser ? 'Enseignant Actif' : (student?.assignedStatus === 'non_affecte' ? 'Non Affecté' : 'Affecté (Régulier)')
+    isTeacherUser ? 'Certifié' : (student?.assignedStatus === 'non_affecte' ? 'Non Affecté' : 'Affecté (Régulier)')
   );
   const [displayAvatar, setDisplayAvatar] = useState(
     isTeacherUser ? (currentUser?.photo || currentUser?.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop') : (student?.photo || student?.photoUrl || currentUser?.photo || currentUser?.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop')
@@ -64,12 +70,64 @@ export default function CardDashboard({
     student?.birthDate || '2006-05-14'
   );
 
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [copiedPhone, setCopiedPhone] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const canDeleteStudent = Boolean(
+    !isTeacherUser && 
+    student && 
+    (currentUser?.role === 'teacher' || 
+     currentUser?.role === 'professeur' || 
+     currentUser?.role === 'prof' || 
+     currentUser?.role === 'admin' || 
+     currentUser?.role === 'director' || 
+     currentUser?.role === 'educator' || 
+     Boolean(currentUser?.isTeacher) || 
+     (currentUser?.accessLevel && currentUser.accessLevel >= 2)) &&
+    currentUser?.role !== 'parent' &&
+    currentUser?.role !== 'student'
+  );
+
+  const handleConfirmDeleteStudent = async () => {
+    if (!student?.id) return;
+    setShowDeleteModal(false);
+    const sId = String(student.id);
+    if (onDeleteStudent) {
+      onDeleteStudent(sId);
+    } else {
+      try {
+        const saved = localStorage.getItem('school_db_students');
+        if (saved) {
+          const list = JSON.parse(saved);
+          localStorage.setItem('school_db_students', JSON.stringify(list.filter((s: any) => String(s.id) !== sId && String(s.studentId) !== sId)));
+        }
+      } catch (e) {}
+      await deleteRealtimeDocument('students', sId).catch(console.error);
+    }
+    if (onBack) {
+      onBack();
+    } else {
+      window.dispatchEvent(new CustomEvent('navigate', { detail: 'students' }));
+    }
+  };
+
+  const handleCopyPhone = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (navigator.clipboard && displayPhone) {
+      navigator.clipboard.writeText(displayPhone);
+      setCopiedPhone(true);
+      setTimeout(() => setCopiedPhone(false), 2000);
+    }
+  };
+
   // Sync state if currentUser or student changes
   useEffect(() => {
     if (isTeacherUser && currentUser) {
       if (currentUser.name) setDisplayName(currentUser.name);
       if (currentUser.subject) setDisplayClass(`Professeur de ${currentUser.subject}`);
       if (currentUser.matricule || currentUser.id) setDisplayMatricule(currentUser.matricule || currentUser.id);
+      setDisplayStatus('Certifié');
       if (currentUser.photo || currentUser.photoUrl) setDisplayAvatar(currentUser.photo || currentUser.photoUrl);
       if (currentUser.phone || currentUser.parentPhone || currentUser.studentPhone) setDisplayPhone(currentUser.phone || currentUser.parentPhone || currentUser.studentPhone);
     } else if (student) {
@@ -249,7 +307,7 @@ export default function CardDashboard({
       const updatedName = editForm.name.trim() || displayName;
       const updatedClass = editForm.class.trim() || displayClass;
       const updatedMatricule = editForm.matricule.trim() || displayMatricule;
-      const updatedStatus = editForm.assignedStatus === 'non_affecte' ? 'Non Affecté' : 'Affecté (Régulier)';
+      const updatedStatus = isTeacherUser ? 'Certifié' : (editForm.assignedStatus === 'non_affecte' ? 'Non Affecté' : 'Affecté (Régulier)');
       const updatedAvatar = editForm.avatarUrl || displayAvatar;
       const updatedPhone = editForm.phone.trim() || displayPhone;
       const updatedBirthDate = editForm.birthDate || displayBirthDate;
@@ -420,67 +478,293 @@ export default function CardDashboard({
           }}
         >
           {/* Header */}
-          <div className="px-6 flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
+          <div className="px-4 sm:px-6 flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <button 
                 onClick={onBack}
-                className="w-11 h-11 rounded-[16px] bg-white/20 dark:bg-white/10 backdrop-blur-xl border border-white/30 dark:border-white/20 flex items-center justify-center hover:bg-white/30 dark:hover:bg-white/20 transition-colors shadow-lg cursor-pointer active:scale-95"
+                className="w-11 h-11 rounded-[16px] bg-white/20 dark:bg-white/10 backdrop-blur-xl border border-white/30 dark:border-white/20 flex items-center justify-center hover:bg-white/30 dark:hover:bg-white/20 transition-colors shadow-lg cursor-pointer active:scale-95 shrink-0"
                 title="Retour à Terminale-D"
               >
                 <ChevronLeft className="text-white w-6 h-6" />
               </button>
-              <div className="flex flex-col">
-                <h1 className="text-[20px] font-bold text-white tracking-wide">{isTeacherUser ? 'Carte Professionnelle' : 'Ma carte scolaire'}</h1>
-                <p className="text-slate-300 text-[12px]">{isTeacherUser ? 'Badge officiel d\'identification enseignant' : 'Carte d\'identification et profil'}</p>
+              <div className="flex flex-col min-w-0 flex-1">
+                <h1 className="text-[20px] font-bold text-white tracking-wide truncate">{isTeacherUser ? 'Carte Professionnelle' : 'Ma carte scolaire'}</h1>
+                <p className="text-slate-300 text-[12px] truncate">{isTeacherUser ? 'Badge officiel d\'identification enseignant' : 'Carte d\'identification et profil'}</p>
               </div>
             </div>
           </div>
 
-          {/* Interactive Profile Card */}
+          {/* Interactive Profile Card with fluid 3D Flip */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4 }}
-            className="flex flex-col items-center justify-center px-6"
+            className="flex flex-col items-center justify-center px-4 sm:px-6 w-full"
           >
-            <ReflectiveCard
-              name={displayName}
-              role={displayClass}
-              badge={isTeacherUser ? 'Collège Fatoumaba • Enseignant' : 'Collège Fatoumaba'}
-              status={displayStatus}
-              statusColor={displayStatus.includes('Non') ? '#f59e0b' : '#22c55e'}
-              idLabel={isTeacherUser ? 'Matricule Prof.' : 'Matricule'}
-              idValue={displayMatricule}
-              avatar={displayAvatar}
-              webcam={false}
-              theme="blue"
-              tint="#BFDBFE"
-              metalness={0.9}
-              roughness={0.25}
-              blurStrength={6}
-              shine={1.2}
-              glare={0.6}
-              grayscale={0}
-              warp={0.5}
-              warpScale={1}
-              bevel={3}
-              tiltStrength={12}
-              radius={24}
-              enableTilt
-              intro
-              width={340}
-              height={460}
-            />
-
-            {/* Bouton d'action rapide sous la carte */}
-            <button
-              onClick={handleOpenEditModal}
-              className="mt-5 w-full max-w-[340px] flex items-center justify-center gap-2.5 py-3 px-4 rounded-[18px] bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-[13px] shadow-xl shadow-sky-500/20 border border-sky-400/30 transition-all cursor-pointer active:scale-98"
+            {/* 3D Flip Card Container */}
+            <div 
+              onClick={() => setIsFlipped(prev => !prev)}
+              className="relative cursor-pointer select-none mx-auto w-full max-w-[340px]"
+              style={{ height: 385, perspective: 1200 }}
+              title="Toucher pour retourner la carte"
             >
-              <Pencil className="w-4 h-4" />
-              <span>Modifier les informations de ma carte</span>
-            </button>
+              <motion.div
+                className="w-full h-full relative"
+                animate={{ rotateY: isFlipped ? 180 : 0 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 22 }}
+                style={{ transformStyle: 'preserve-3d' }}
+              >
+                {/* RECTO (FACE AVANT) */}
+                <div 
+                  className="absolute inset-0 w-full h-full flex justify-center items-center"
+                  style={{ 
+                    backfaceVisibility: 'hidden', 
+                    WebkitBackfaceVisibility: 'hidden' 
+                  }}
+                >
+                  <ReflectiveCard
+                    className="reflective-card--compact w-full"
+                    name={displayName}
+                    role={displayClass}
+                    badge={isTeacherUser ? 'Collège Fatoumaba • Enseignant' : 'Collège Fatoumaba'}
+                    status={displayStatus}
+                    statusColor={displayStatus.includes('Non') ? '#f59e0b' : '#22c55e'}
+                    idLabel={isTeacherUser ? 'Expertise' : 'Matricule'}
+                    idValue={
+                      isTeacherUser ? (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="w-4.5 h-4.5 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center shrink-0 shadow-sm border border-emerald-300/40">
+                            <CheckCircle2 size={11} strokeWidth={3} />
+                          </span>
+                          <span 
+                            className="text-[13px] uppercase tracking-wider text-emerald-800" 
+                            style={{ 
+                              fontFamily: "'Montserrat', sans-serif", 
+                              fontWeight: 900, 
+                              WebkitTextStroke: '0.4px #065f46',
+                              letterSpacing: '0.05em'
+                            }}
+                          >
+                            Légendaire
+                          </span>
+                        </div>
+                      ) : (
+                        displayMatricule
+                      )
+                    }
+                    avatar={displayAvatar}
+                    webcam={false}
+                    theme="blue"
+                    tint="#BFDBFE"
+                    metalness={0.9}
+                    roughness={0.25}
+                    blurStrength={6}
+                    shine={1.2}
+                    glare={0.6}
+                    grayscale={0}
+                    warp={0.5}
+                    warpScale={1}
+                    bevel={3}
+                    tiltStrength={12}
+                    radius={24}
+                    enableTilt={!isFlipped}
+                    intro
+                    width="100%"
+                    height={385}
+                  />
+                </div>
+
+                {/* VERSO (FACE ARRIÈRE) */}
+                <div 
+                  className="absolute inset-0 w-full h-full rounded-[24px] overflow-hidden bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0b1329] border-2 border-[#BFDBFE]/80 shadow-[0_20px_45px_-15px_rgba(29,78,216,0.45),0_0_24px_rgba(191,219,254,0.35)] flex flex-col justify-between p-4 text-white"
+                  style={{ 
+                    backfaceVisibility: 'hidden', 
+                    WebkitBackfaceVisibility: 'hidden',
+                    transform: 'rotateY(180deg)' 
+                  }}
+                >
+                  {/* En-tête officiel République & Établissement */}
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-sky-500/20 text-sky-400 border border-sky-400/30 flex items-center justify-center font-bold text-xs">
+                        CF
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black tracking-widest text-amber-300 uppercase block truncate">
+                          RÉPUBLIQUE DE CÔTE D'IVOIRE
+                        </span>
+                        <span className="text-[11px] font-bold text-white tracking-wide block truncate">
+                          Collège & Lycée Fatoumaba
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded-md border border-white/15 shrink-0">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-[9px] font-bold text-slate-200">VERSO</span>
+                    </div>
+                  </div>
+
+                  {/* Section Numéro de téléphone bien mise en valeur */}
+                  <div className="bg-sky-500/15 border border-sky-400/30 rounded-2xl p-2.5 flex items-center justify-between shadow-inner min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 to-blue-500 text-white flex items-center justify-center shadow-md shrink-0">
+                        <Phone className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-sky-300 block truncate">
+                          {isTeacherUser ? 'Téléphone Professionnel' : 'Numéro de l\'Élève'}
+                        </span>
+                        <span className="text-[14px] font-black text-white font-mono tracking-wide block truncate">
+                          {displayPhone || '+225 07 00 00 00 00'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                      <button 
+                        onClick={handleCopyPhone}
+                        className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                        title="Copier le numéro"
+                      >
+                        {copiedPhone ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                      <a 
+                        href={`tel:${(displayPhone || '').replace(/\s+/g, '')}`}
+                        className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-colors cursor-pointer"
+                        title="Appeler"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Détails supplémentaires sans rien enlever */}
+                  <div className="grid grid-cols-2 gap-2 text-left">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-2 min-w-0 overflow-hidden">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block truncate">
+                        {isTeacherUser ? 'Contact d\'urgence' : 'Téléphone Parent / Tuteur'}
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-100 font-mono block truncate mt-0.5">
+                        {student?.parentPhone || student?.fatherPhone || student?.motherPhone || '+225 01 02 03 04 05'}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-2 min-w-0 overflow-hidden">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block truncate">
+                        Date de naissance
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-100 block truncate mt-0.5">
+                        {displayBirthDate || '14/05/2006'}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-2 min-w-0 overflow-hidden">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block truncate">
+                        {isTeacherUser ? 'Matricule Enseignant' : 'Matricule Scolaire'}
+                      </span>
+                      <span className="text-[11px] font-black text-sky-300 font-mono block truncate mt-0.5">
+                        {displayMatricule}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-2 min-w-0 overflow-hidden">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block truncate">
+                        Statut & Validité
+                      </span>
+                      <span className="text-[11px] font-bold text-emerald-400 block truncate mt-0.5">
+                        {displayStatus} • 2024-2025
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Code barre officiel & Sceau de sécurité */}
+                  <div className="border-t border-white/10 pt-2 flex flex-col items-center">
+                    <div className="bg-white px-3 py-1 rounded-lg w-full flex flex-col items-center shadow-xs">
+                      <div className="flex items-center justify-center gap-[2px] h-6 w-full max-w-[240px]">
+                        {[3,1,2,1,4,1,2,3,1,2,1,4,2,1,3,1,2,4,1,3,2,1,4,1,2,3,1,2,1,3,2,1,4,1,2,3,1,2,4,1,2,3,1,4].map((w, idx) => (
+                          <span 
+                            key={idx} 
+                            className="bg-slate-900 inline-block h-full" 
+                            style={{ width: `${w}px` }} 
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[9px] font-mono font-bold text-slate-800 tracking-[0.25em] mt-0.5">
+                        *{displayMatricule}*
+                      </span>
+                    </div>
+                    <p className="text-[8px] text-slate-400 text-center leading-tight mt-1.5 px-2">
+                      Carte officielle d'identification. En cas de perte, merci de la rapporter à la direction.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Bouton d'action sous la carte */}
+            <div className="mt-4 flex flex-col items-center gap-2.5 w-full max-w-[340px] mx-auto">
+
+              <button
+                onClick={handleOpenEditModal}
+                className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-[18px] bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-[13px] shadow-xl shadow-sky-500/20 border border-sky-400/30 transition-all cursor-pointer active:scale-98"
+              >
+                <Pencil className="w-4 h-4" />
+                <span>Modifier les informations de ma carte</span>
+              </button>
+
+              {canDeleteStudent && (
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-[18px] bg-red-500/15 hover:bg-red-500/25 text-red-300 font-bold text-[13px] border border-red-500/30 transition-all cursor-pointer active:scale-98"
+                >
+                  <Trash2 className="w-4 h-4 text-red-400" />
+                  <span>Supprimer la carte de l'élève</span>
+                </button>
+              )}
+            </div>
           </motion.div>
+
+          {/* Delete Student Modal */}
+          <AnimatePresence>
+            {showDeleteModal && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                  onClick={() => setShowDeleteModal(false)}
+                />
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="bg-slate-900 border border-white/10 rounded-3xl p-6 shadow-2xl z-10 w-full max-w-sm text-center flex flex-col items-center relative overflow-hidden"
+                >
+                  <div className="w-14 h-14 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center mb-3">
+                    <Trash2 size={28} />
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-1">Supprimer la carte de l'élève ?</h3>
+                  <p className="text-slate-300 mb-6 text-xs font-medium">
+                    Êtes-vous sûr de vouloir supprimer la carte de <span className="font-bold text-white">{displayName}</span> ? Cette action est irréversible.
+                  </p>
+                  <div className="flex w-full gap-3">
+                    <button
+                      onClick={() => setShowDeleteModal(false)}
+                      className="flex-1 py-3 rounded-2xl font-bold text-xs bg-white/10 text-slate-300 hover:bg-white/20 transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleConfirmDeleteStudent}
+                      className="flex-1 py-3 rounded-2xl font-bold text-xs bg-red-500 text-white hover:bg-red-600 transition-colors shadow-lg shadow-red-500/30"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
 
           {/* Success Toast */}
           <AnimatePresence>
@@ -489,7 +773,7 @@ export default function CardDashboard({
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="mx-6 mt-4 p-3 bg-emerald-500/20 border border-emerald-400/40 backdrop-blur-md rounded-2xl flex items-center gap-3 text-emerald-200 text-xs font-semibold shadow-lg"
+                className="mx-4 sm:mx-6 mt-4 p-3 bg-emerald-500/20 border border-emerald-400/40 backdrop-blur-md rounded-2xl flex items-center gap-3 text-emerald-200 text-xs font-semibold shadow-lg"
               >
                 <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
                   <Check size={14} strokeWidth={3} />
@@ -504,141 +788,141 @@ export default function CardDashboard({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15, duration: 0.4 }}
-            className="px-6 mt-6 pb-10"
+            className="px-4 sm:px-6 mt-6 pb-10 w-full max-w-[372px] sm:max-w-[500px] mx-auto"
           >
             {isTeacherUser ? (
               <div className="grid grid-cols-2 gap-3.5">
                 {/* Discipline */}
-                <div className="bg-white/10 dark:bg-white/5 backdrop-blur-xl rounded-[24px] p-4 border border-white/15 dark:border-white/10 shadow-lg flex flex-col justify-between min-h-[110px]">
+                <div className="bg-white/10 dark:bg-white/5 backdrop-blur-xl rounded-[24px] p-4 border border-white/15 dark:border-white/10 shadow-lg flex flex-col justify-between min-h-[110px] min-w-0 overflow-hidden">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase">Discipline</span>
-                    <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+                    <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase truncate">Discipline</span>
+                    <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30 shrink-0">
                       <GraduationCap className="w-4 h-4" />
                     </div>
                   </div>
-                  <div>
-                    <span className="text-[18px] font-black tracking-tight text-white leading-none">
+                  <div className="min-w-0">
+                    <span className="text-[18px] font-black tracking-tight text-white leading-none truncate block">
                       {currentUser?.subject || 'Mathématiques'}
                     </span>
-                    <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1">Matière principale</p>
+                    <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1 truncate">Matière principale</p>
                   </div>
                 </div>
 
                 {/* Taux de compréhension */}
-                <div className="bg-white/10 dark:bg-white/5 backdrop-blur-xl rounded-[24px] p-4 border border-white/15 dark:border-white/10 shadow-lg flex flex-col justify-between min-h-[110px]">
+                <div className="bg-white/10 dark:bg-white/5 backdrop-blur-xl rounded-[24px] p-4 border border-white/15 dark:border-white/10 shadow-lg flex flex-col justify-between min-h-[110px] min-w-0 overflow-hidden">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase">Taux de compréhension</span>
-                    <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/30">
+                    <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase truncate">Taux de compréhension</span>
+                    <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/30 shrink-0">
                       <Sparkles className="w-4 h-4" />
                     </div>
                   </div>
-                  <div>
-                    <span className="text-[20px] font-black tracking-tight text-white leading-none">
+                  <div className="min-w-0">
+                    <span className="text-[20px] font-black tracking-tight text-white leading-none truncate block">
                       100%
                     </span>
-                    <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1">Performance pédagogique</p>
+                    <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1 truncate">Performance pédagogique</p>
                   </div>
                 </div>
 
                 {/* Expertise */}
-                <div className="bg-emerald-500/10 backdrop-blur-xl rounded-[24px] p-4 border border-emerald-500/30 shadow-lg flex flex-col justify-between min-h-[110px]">
+                <div className="bg-emerald-500/10 backdrop-blur-xl rounded-[24px] p-4 border border-emerald-500/30 shadow-lg flex flex-col justify-between min-h-[110px] min-w-0 overflow-hidden">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold tracking-wider text-emerald-300 uppercase">Expertise</span>
-                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                    <span className="text-[11px] font-bold tracking-wider text-emerald-300 uppercase truncate">Expertise</span>
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
                       <Award className="w-4 h-4" />
                     </div>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-[18px] font-black tracking-tight text-emerald-300 leading-none truncate block">
                       Légendaire
                     </span>
-                    <p className="text-[10px] text-emerald-300/80 font-semibold tracking-wider uppercase mt-1">Niveau d'excellence</p>
+                    <p className="text-[10px] text-emerald-300/80 font-semibold tracking-wider uppercase mt-1 truncate">Niveau d'excellence</p>
                   </div>
                 </div>
 
                 {/* Contact */}
-                <div className="bg-amber-500/10 backdrop-blur-xl rounded-[24px] p-4 border border-amber-500/30 shadow-lg flex flex-col justify-between min-h-[110px]">
+                <div className="bg-amber-500/10 backdrop-blur-xl rounded-[24px] p-4 border border-amber-500/30 shadow-lg flex flex-col justify-between min-h-[110px] min-w-0 overflow-hidden">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold tracking-wider text-amber-300 uppercase">Contact</span>
-                    <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                    <span className="text-[11px] font-bold tracking-wider text-amber-300 uppercase truncate">Contact</span>
+                    <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shrink-0">
                       <Phone className="w-4 h-4" />
                     </div>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-[15px] font-bold tracking-tight text-amber-300 leading-none truncate block">
                       {displayPhone}
                     </span>
-                    <p className="text-[10px] text-amber-300/80 font-semibold tracking-wider uppercase mt-1">Téléphone professionnel</p>
+                    <p className="text-[10px] text-amber-300/80 font-semibold tracking-wider uppercase mt-1 truncate">Téléphone professionnel</p>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3.5">
               {/* Moyenne réelle */}
-              <div className="bg-white/10 dark:bg-white/5 backdrop-blur-xl rounded-[24px] p-4 border border-white/15 dark:border-white/10 shadow-lg flex flex-col justify-between min-h-[110px]">
+              <div className="bg-white/10 dark:bg-white/5 backdrop-blur-xl rounded-[24px] p-4 border border-white/15 dark:border-white/10 shadow-lg flex flex-col justify-between min-h-[110px] min-w-0 overflow-hidden">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase">Moyenne</span>
-                  <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+                  <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase truncate">Moyenne</span>
+                  <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30 shrink-0">
                     <Award className="w-4 h-4" />
                   </div>
                 </div>
-                <div>
-                  <span className="text-[20px] font-black tracking-tight text-white leading-none">
+                <div className="min-w-0">
+                  <span className="text-[20px] font-black tracking-tight text-white leading-none truncate block">
                     {realAverageData.display}
                   </span>
-                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1">
+                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1 truncate">
                     {realAverageData.label}
                   </p>
                 </div>
               </div>
 
               {/* Matricule */}
-              <div className="bg-white/10 dark:bg-white/5 backdrop-blur-xl rounded-[24px] p-4 border border-white/15 dark:border-white/10 shadow-lg flex flex-col justify-between min-h-[110px]">
+              <div className="bg-white/10 dark:bg-white/5 backdrop-blur-xl rounded-[24px] p-4 border border-white/15 dark:border-white/10 shadow-lg flex flex-col justify-between min-h-[110px] min-w-0 overflow-hidden">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase">Matricule</span>
-                  <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/30">
+                  <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase truncate">Matricule</span>
+                  <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/30 shrink-0">
                     <Award className="w-4 h-4" />
                   </div>
                 </div>
-                <div>
-                  <span className="text-[19px] font-mono font-black tracking-tight text-white leading-none">
+                <div className="min-w-0">
+                  <span className="text-[19px] font-mono font-black tracking-tight text-white leading-none truncate block">
                     {displayMatricule}
                   </span>
-                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1">Identifiant élève</p>
+                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1 truncate">Identifiant élève</p>
                 </div>
               </div>
 
               {/* Taux de réussite */}
-              <div className="bg-emerald-500/10 backdrop-blur-xl rounded-[24px] p-4 border border-emerald-500/30 shadow-lg flex flex-col justify-between min-h-[110px]">
+              <div className="bg-emerald-500/10 backdrop-blur-xl rounded-[24px] p-4 border border-emerald-500/30 shadow-lg flex flex-col justify-between min-h-[110px] min-w-0 overflow-hidden">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold tracking-wider text-emerald-300 uppercase">Taux de réussite</span>
-                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                  <span className="text-[11px] font-bold tracking-wider text-emerald-300 uppercase truncate">Taux de réussite</span>
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
                     <TrendingUp className="w-4 h-4" />
                   </div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <span className="text-[20px] font-black tracking-tight text-emerald-300 leading-none truncate block">
                     {realSuccessRate.rate}
                   </span>
-                  <p className="text-[10px] text-emerald-300/80 font-semibold tracking-wider uppercase mt-1">
+                  <p className="text-[10px] text-emerald-300/80 font-semibold tracking-wider uppercase mt-1 truncate">
                     {realSuccessRate.subtext}
                   </p>
                 </div>
               </div>
 
               {/* Régime / Statut */}
-              <div className="bg-amber-500/10 backdrop-blur-xl rounded-[24px] p-4 border border-amber-500/30 shadow-lg flex flex-col justify-between min-h-[110px]">
+              <div className="bg-amber-500/10 backdrop-blur-xl rounded-[24px] p-4 border border-amber-500/30 shadow-lg flex flex-col justify-between min-h-[110px] min-w-0 overflow-hidden">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold tracking-wider text-amber-300 uppercase">Régime</span>
-                  <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <span className="text-[11px] font-bold tracking-wider text-amber-300 uppercase truncate">Régime</span>
+                  <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shrink-0">
                     <School className="w-4 h-4" />
                   </div>
                 </div>
-                <div>
-                  <span className="text-[17px] font-black tracking-tight text-amber-300 leading-none">
+                <div className="min-w-0">
+                  <span className="text-[17px] font-black tracking-tight text-amber-300 leading-none truncate block">
                     {displayStatus}
                   </span>
-                  <p className="text-[10px] text-amber-300/80 font-semibold tracking-wider uppercase mt-1">Année 2025-2026</p>
+                  <p className="text-[10px] text-amber-300/80 font-semibold tracking-wider uppercase mt-1 truncate">Année 2025-2026</p>
                 </div>
               </div>
             </div>
@@ -786,20 +1070,32 @@ export default function CardDashboard({
                   </div>
                 </div>
 
-                {/* Statut d'affectation */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Statut / Régime
-                  </label>
-                  <select
-                    value={editForm.assignedStatus}
-                    onChange={e => setEditForm({ ...editForm, assignedStatus: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition-colors cursor-pointer"
-                  >
-                    <option value="affecte">Affecté par l'État (Régulier)</option>
-                    <option value="non_affecte">Non Affecté (Libre)</option>
-                  </select>
-                </div>
+                {/* Statut d'affectation / Certification */}
+                {!isTeacherUser ? (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Statut / Régime
+                    </label>
+                    <select
+                      value={editForm.assignedStatus}
+                      onChange={e => setEditForm({ ...editForm, assignedStatus: e.target.value })}
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 transition-colors cursor-pointer"
+                    >
+                      <option value="affecte">Affecté par l'État (Régulier)</option>
+                      <option value="non_affecte">Non Affecté (Libre)</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Statut Enseignant
+                    </label>
+                    <div className="w-full px-3 py-2.5 bg-slate-800 border border-emerald-500/40 rounded-xl text-sm text-emerald-400 font-bold flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span>Certifié • Validé par l'Établissement</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Téléphone & Date de naissance */}
                 <div className="grid grid-cols-2 gap-3">

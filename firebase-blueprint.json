@@ -27,6 +27,22 @@
         "studentId": { "type": "string" }
       },
       "required": ["id", "name", "class", "studentId"]
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "Class schedule real-time document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "className": { "type": "string" },
+        "events": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "updatedAtIso": { "type": "string" }
+      },
+      "required": ["id", "classId", "events"]
     }
   },
   "firestore": {
@@ -37,6 +53,10 @@
     "/students/{studentId}": {
       "schema": "Student",
       "description": "Student records collection"
+    },
+    "/schedules/{scheduleId}": {
+      "schema": "Schedule",
+      "description": "Class schedules collection"
     }
   }
 }

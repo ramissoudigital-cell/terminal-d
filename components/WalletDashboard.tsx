@@ -16,6 +16,7 @@ import { getSubjectCoef } from './TransactionList';
 import { COUNTRIES_DATA } from '../data/countries';
 import { mockClasses } from '../data/mockData';
 import { getGradeAppreciations } from '../src/utils/gradeAppreciations';
+import { deleteRealtimeDocument } from '../src/services/firebaseService';
 
 interface WalletDashboardProps {
   readOnly?: boolean;
@@ -969,7 +970,8 @@ export default function WalletDashboard({
                         currentUser?.role === 'professeur' || 
                         currentUser?.role === 'prof' || 
                         currentUser?.role === 'enseignant' || 
-                        Boolean(currentUser?.isTeacher);
+                        Boolean(currentUser?.isTeacher) ||
+                        currentUser?.accessLevel === 3;
 
   const isAdminOrDirector = (currentUser?.role === 'admin' || currentUser?.role === 'director' || currentUser?.accessLevel === 5) && !isEducator;
   const isStaffWhoCanManageStudents = !readOnly && (
@@ -978,10 +980,12 @@ export default function WalletDashboard({
     currentUser?.role === 'educator' || 
     currentUser?.role === 'éducateur' || 
     currentUser?.role === 'cashier' || 
+    isTeacherRole ||
     currentUser?.accessLevel === 2 || 
+    currentUser?.accessLevel === 3 || 
     currentUser?.accessLevel === 5 || 
     currentUser?.accessLevel === 4
-  ) && currentUser?.role !== 'teacher' && currentUser?.role !== 'parent' && currentUser?.role !== 'student';
+  ) && currentUser?.role !== 'parent' && currentUser?.role !== 'student';
 
   const canSignTeacherSignature = propCanSign !== undefined ? propCanSign : (isAdminOrDirector || isPrincipalForClass || isTeacherRole);
   const canEditAppreciation = isAdminOrDirector || isPrincipalForClass || isTeacherRole;
@@ -1033,37 +1037,36 @@ export default function WalletDashboard({
           </div>
       ) : (
           <div className="flex justify-between items-center mb-8 px-6 shrink-0 relative z-50">
-             <div className="flex items-center gap-2.5">
+             <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-3">
                 <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-sm overflow-hidden p-0.5 shrink-0 border border-white/60">
                   <img src="logo.png" alt="Terminale D Logo" className="w-full h-full object-contain" onError={(e) => { e.currentTarget.src = 'icone.png'; }} />
                 </div>
-                <h1 className="text-white text-[24px] sm:text-[28px] font-black tracking-tight">Terminale D</h1>
+                <h1 className="text-white text-[24px] sm:text-[28px] font-black tracking-tight truncate">Terminale D</h1>
              </div>
-             <div className="flex space-x-3 items-center">
+             <div className="flex space-x-3 items-center shrink-0">
                 <button 
                     onClick={() => setShowMobileSearch(true)}
-                    className="w-10 h-10 rounded-full bg-white/40 flex items-center justify-center backdrop-blur-md border border-white/50 hover:bg-white/60 transition-colors"
+                    className="w-10 h-10 rounded-full bg-white/40 flex items-center justify-center backdrop-blur-md border border-white/50 hover:bg-white/60 transition-colors shrink-0"
                 >
                    <Search className="w-5 h-5 text-slate-900" strokeWidth={2} />
                 </button>
                 {!(currentUser?.role === 'student' || currentUser?.role === 'teacher' || currentUser?.accessLevel === 1) && (
                    <button 
-                      onClick={() => setIsPrintModalOpen(true)}
-                      title="Imprimer le bulletin de notes"
-                      className="btn-print hidden sm:flex w-10 h-10 rounded-full bg-white/40 items-center justify-center backdrop-blur-md border border-white/50 hover:bg-white/60 transition-colors cursor-pointer active:scale-95"
+                       onClick={() => setIsPrintModalOpen(true)}
+                       title="Imprimer le bulletin de notes"
+                       className="btn-print hidden sm:flex w-10 h-10 rounded-full bg-white/40 items-center justify-center backdrop-blur-md border border-white/50 hover:bg-white/60 transition-colors cursor-pointer active:scale-95 shrink-0"
                    >
                       <Printer className="w-5 h-5 text-slate-900" strokeWidth={2} />
                    </button>
                 )}
-                <div className="relative">
+                <div className="relative shrink-0">
                    <button 
-                      onClick={() => setAppBarMenuOpen(!appBarMenuOpen)}
-                      className="w-10 h-10 bg-white/90 rounded-2xl flex items-center justify-center transition-transform hover:scale-105 shadow-sm border border-slate-100 ml-1"
+                       onClick={() => setAppBarMenuOpen(!appBarMenuOpen)}
+                       className="w-10 h-10 bg-white/90 rounded-2xl flex items-center justify-center transition-transform hover:scale-105 shadow-sm border border-slate-100 ml-1"
                    >
                       <Plus className={`w-5 h-5 text-slate-700 transition-transform duration-300 ${appBarMenuOpen ? 'rotate-45' : ''}`} strokeWidth={2.5} />
                    </button>
-    
-                   <AnimatePresence>
+                       <AnimatePresence>
                       {appBarMenuOpen && (
                          <motion.div 
                             initial={{ opacity: 0, y: -10 }}
@@ -1084,8 +1087,6 @@ export default function WalletDashboard({
                 </div>
              </div>
           </div>
-
-
       )}
 
       {/* Main Container Card */}
@@ -1164,7 +1165,22 @@ export default function WalletDashboard({
                   } catch (e) {}
                 }
               }}
-              onDelete={isStaffWhoCanManageStudents && onDelete ? () => setShowDeleteStudentConfirm(true) : undefined} 
+              onDelete={isStaffWhoCanManageStudents ? () => {
+                if (onDelete) {
+                  onDelete();
+                } else if (student?.id) {
+                  const sId = String(student.id);
+                  try {
+                    const saved = localStorage.getItem('school_db_students');
+                    if (saved) {
+                      const list = JSON.parse(saved);
+                      localStorage.setItem('school_db_students', JSON.stringify(list.filter((s: any) => String(s.id) !== sId && String(s.studentId) !== sId)));
+                    }
+                  } catch (e) {}
+                  deleteRealtimeDocument('students', sId).catch(console.error);
+                  if (onNavigate) onNavigate('students');
+                }
+              } : undefined} 
               readOnly={readOnly && !isStudent} 
               schoolName={studentInfo.school} 
               onNavigate={onNavigate}
@@ -1174,9 +1190,9 @@ export default function WalletDashboard({
 
          {/* Solde disponible & Chart */}
          <div className="flex justify-between items-start mb-8 relative z-50">
-            <div>
-               <p className="text-slate-500 text-[13px] font-medium mb-1">Moyenne Générale ({formatPeriodLabel(selectedTrim, student?.class)})</p>
-               <h2 className="text-slate-900 text-[32px] font-bold tracking-tight leading-none">
+            <div className="min-w-0 flex-1 pr-3">
+               <p className="text-slate-500 text-[13px] font-medium mb-1 truncate">Moyenne Générale ({formatPeriodLabel(selectedTrim, student?.class)})</p>
+               <h2 className="text-slate-900 text-[32px] font-bold tracking-tight leading-none truncate">
                  {average}<span className="text-[20px] text-slate-400 font-semibold">/20</span>
                </h2>
             </div>
@@ -1253,18 +1269,18 @@ export default function WalletDashboard({
                    className={`bg-white rounded-[24px] p-4 flex items-center justify-between shadow-[0_4px_20px_rgba(0,0,0,0.03)] ${isSubjectDisabled ? 'opacity-50 cursor-not-allowed grayscale' : 'cursor-pointer hover:scale-[1.02] transition-transform'}`}
                     style={{ border: subject.active ? `1.5px solid ${subject.hex}` : '1.5px solid #f1f5f9' }}
                 >
-                    <div className="flex items-center gap-3 sm:gap-4">
-                        <div className={`w-[52px] h-[52px] rounded-[18px] ${subject.color} flex items-center justify-center text-white shadow-sm`}>
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 pr-4">
+                        <div className={`w-[52px] h-[52px] rounded-[18px] ${subject.color} flex items-center justify-center text-white shadow-sm shrink-0`}>
                             <BookOpen className="w-[26px] h-[26px]" strokeWidth={2.5} />
                         </div>
-                        <div>
-                            <h3 className="text-slate-900 font-bold text-[16px]">{subject.name}</h3>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-slate-900 font-bold text-[16px] truncate">{subject.name}</h3>
                             {subject.coef === 0 ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 mt-0.5">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 mt-0.5 truncate max-w-full">
                                 Bonus
                               </span>
                             ) : (
-                              <p className="text-slate-400 text-[13px] font-medium mt-0.5">Coef. {subject.coef}</p>
+                              <p className="text-slate-400 text-[13px] font-medium mt-0.5 truncate">Coef. {subject.coef}</p>
                             )}
                         </div>
                     </div>

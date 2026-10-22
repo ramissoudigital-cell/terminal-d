@@ -9,6 +9,7 @@ import ReflectiveCard from './ReflectiveCard';
 import { ProfileCard } from './ProfileCard';
 import { isSameClass } from '../src/utils/parentUtils';
 import { saveRealtimeDocument, deleteRealtimeDocument } from '../src/services/firebaseService';
+import { getTeacherIndividualAccreditationCode, setTeacherIndividualAccreditationCode } from '../src/utils/accreditationUtils';
 
 interface TeachersPageProps {
     teachers?: Teacher[];
@@ -171,7 +172,8 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       subject: 'Mathématiques',
       phone: '',
       email: '',
-      assignedClasses: [] as string[]
+      assignedClasses: [] as string[],
+      accreditationCode: ''
   });
 
   const [lastUpdateTs, setLastUpdateTs] = useState(() => Date.now());
@@ -205,13 +207,15 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
 
   const handleOpenEditTeacher = (t: Teacher) => {
       setEditingTeacher(t);
+      const existingAccred = t.accreditationCode || getTeacherIndividualAccreditationCode(t) || '';
       setEditTeacherForm({
           name: t.name || '',
           matricule: t.matricule || '',
           subject: t.subject || 'Mathématiques',
           phone: t.phone || '',
           email: t.email || '',
-          assignedClasses: Array.isArray(t.assignedClasses) ? t.assignedClasses : []
+          assignedClasses: Array.isArray(t.assignedClasses) ? t.assignedClasses : [],
+          accreditationCode: existingAccred
       });
       setIsEditTeacherModalOpen(true);
   };
@@ -220,6 +224,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       e.preventDefault();
       if (!editingTeacher || !editTeacherForm.name.trim()) return;
 
+      const formattedAccred = (editTeacherForm.accreditationCode || '').trim().toUpperCase();
       const updated: Teacher = {
           ...editingTeacher,
           name: editTeacherForm.name.trim(),
@@ -227,7 +232,8 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
           subject: editTeacherForm.subject,
           phone: editTeacherForm.phone.trim(),
           email: editTeacherForm.email.trim(),
-          assignedClasses: editTeacherForm.assignedClasses
+          assignedClasses: editTeacherForm.assignedClasses,
+          accreditationCode: formattedAccred || editingTeacher.accreditationCode
       };
 
       if (onUpdateTeacher) {
@@ -243,9 +249,22 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
           console.error(err);
       }
 
-      // Sync to Firestore
+      // Sync to Firestore in real-time
       try {
           await saveRealtimeDocument('teachers', String(updated.id), updated);
+          if (formattedAccred) {
+            setTeacherIndividualAccreditationCode(
+              { id: updated.id, email: updated.email, subject: updated.subject },
+              formattedAccred
+            );
+            await saveRealtimeDocument('accreditation_codes', String(updated.id), {
+              teacherId: updated.id,
+              email: updated.email,
+              subject: updated.subject,
+              code: formattedAccred,
+              updatedAt: Date.now()
+            });
+          }
       } catch (err) {
           console.warn('Realtime teacher update notice:', err);
       }
@@ -875,10 +894,10 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                 </button>
             </div>
         ) : (
-            <div className="md:hidden flex justify-between items-center mb-8 px-6 shrink-0 print:hidden">
-                <div>
-                    <h1 className="text-white text-[24px] font-bold tracking-tight">Professeurs</h1>
-                    {isLevel1 && <p className="text-white/80 text-xs font-semibold">Classe : {studentClass || 'Non spécifiée'}</p>}
+            <div className="md:hidden flex justify-between items-center mb-8 px-6 shrink-0 print:hidden min-w-0">
+                <div className="min-w-0 flex-1 pr-3">
+                    <h1 className="text-white text-[24px] font-bold tracking-tight truncate">Professeurs</h1>
+                    {isLevel1 && <p className="text-white/80 text-xs font-semibold truncate">Classe : {studentClass || 'Non spécifiée'}</p>}
                 </div>
                 <div className="flex space-x-2">
                     <button 
@@ -963,15 +982,15 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                                 {idx + 1}
                               </span>
                             </td>
-                            <td className="py-4 px-4 print:py-2 print:px-2">
-                              <div className="flex items-center gap-3">
+                            <td className="py-4 px-4 print:py-2 print:px-2 max-w-[220px]">
+                              <div className="flex items-center gap-3 min-w-0">
                                 <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200 shrink-0 print:hidden">
                                   <img src={teacher.photo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200"} alt={teacher.name} className="w-full h-full object-cover" />
                                 </div>
-                                <div>
-                                  <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors print:text-slate-900">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors print:text-slate-900 truncate">
                                     {teacher.name}
-                                    {isMe && <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-sky-100 text-sky-700 rounded-md print:hidden">MOI</span>}
+                                    {isMe && <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-sky-100 text-sky-700 rounded-md print:hidden shrink-0">MOI</span>}
                                   </p>
                                   <div className="flex flex-col gap-0.5 mt-0.5">
                                     <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Expertise</span>
@@ -979,7 +998,12 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                                       <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
                                         <CheckCircle2 size={10} strokeWidth={3} />
                                       </span>
-                                      <strong className="font-black text-emerald-800">Légendaire</strong>
+                                      <strong 
+                                        className="font-black text-emerald-800 tracking-wider uppercase text-[12px]" 
+                                        style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 900, WebkitTextStroke: '0.3px #065f46' }}
+                                      >
+                                        Légendaire
+                                      </strong>
                                     </span>
                                   </div>
                                 </div>
@@ -1118,23 +1142,88 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
 
                       return (
                         <div key={teacher.id} className="relative flex flex-col items-center w-full max-w-[310px]">
-                          {/* Enlarged Reflective Card with Options Menu on Top */}
-                          <div className="relative w-[300px]">
+                          {/* Barre supérieure juste au-dessus de la carte avec bouton Option à droite */}
+                          <div className="w-[300px] max-w-full flex items-center justify-between mb-1.5 px-1 min-h-[28px] relative z-20">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 truncate">
+                                {teacher.subject || 'Enseignant'}
+                              </span>
+                            </div>
+
+                            {canManageProfile && (
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuTeacherId(activeMenuTeacherId === teacher.id ? null : teacher.id);
+                                  }}
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200/90 shadow-xs transition-all cursor-pointer active:scale-95"
+                                  title="Options du professeur"
+                                >
+                                  <span className="text-[11px] font-bold text-slate-600">Option</span>
+                                  <MoreVertical size={13} className="text-slate-500" />
+                                </button>
+
+                                {activeMenuTeacherId === teacher.id && (
+                                  <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute right-0 top-8 z-50 w-44 bg-slate-900/95 text-white rounded-2xl shadow-2xl border border-white/10 p-1.5 space-y-1 backdrop-blur-xl animate-in fade-in zoom-in-95"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuTeacherId(null);
+                                        handleOpenEditTeacher(teacher);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-200 hover:bg-white/10 transition-colors cursor-pointer"
+                                    >
+                                      <Edit3 size={15} className="text-sky-400" />
+                                      <span>Modifier</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuTeacherId(null);
+                                        handleDeleteTeacherAction(teacher);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 size={15} className="text-rose-400" />
+                                      <span>Supprimer</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Enlarged Reflective Card (propre sans bouton d'option sur la carte) */}
+                          <div className="relative w-[300px]" style={{ height: 335 }}>
                             <ReflectiveCard
+                              className="reflective-card--compact"
                               name={teacher.name}
                               role={teacher.subject}
                               badge={teacher.isPrincipal ? "Prof. Principal" : "Enseignant"}
-                              status={teacher.authUid || teacher.status === 'Actif' ? 'En ligne' : 'Inactif'}
+                              status={teacher.authUid || teacher.status === 'Actif' ? 'Certifié' : 'Inactif'}
                               statusColor={teacher.authUid || teacher.status === 'Actif' ? '#22c55e' : '#f59e0b'}
                               idLabel="Expertise"
                               idValue={
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                                  <span className="w-4.5 h-4.5 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center shrink-0 shadow-sm border border-emerald-300/40">
                                     <CheckCircle2 size={11} strokeWidth={3} />
                                   </span>
-                                  <strong className="text-[13px] font-black uppercase tracking-wider text-emerald-800">
+                                  <span 
+                                    className="text-[13px] uppercase tracking-wider text-emerald-800" 
+                                    style={{ 
+                                      fontFamily: "'Montserrat', sans-serif", 
+                                      fontWeight: 900, 
+                                      WebkitTextStroke: '0.4px #065f46',
+                                      letterSpacing: '0.05em'
+                                    }}
+                                  >
                                     Légendaire
-                                  </strong>
+                                  </span>
                                 </div>
                               }
                               avatar={teacher.photo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600"}
@@ -1153,7 +1242,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                               enableTilt
                               intro
                               width={300}
-                              height={435}
+                              height={335}
                               onClick={() => {
                                 if (showScheduleBtn) handleOpenSchedule(teacher);
                               }}
@@ -1172,69 +1261,31 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                                 </div>
                               }
                             />
-
-                            {/* Options Button Grouping Modifier & Supprimer ON the Card */}
-                            <div className="absolute top-3.5 right-3.5 z-30">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMenuTeacherId(activeMenuTeacherId === teacher.id ? null : teacher.id);
-                                }}
-                                className="w-8 h-8 rounded-full bg-white/80 hover:bg-white text-slate-700 hover:text-slate-900 flex items-center justify-center shadow-md backdrop-blur-md border border-white/90 transition-all cursor-pointer active:scale-95"
-                                title="Options du professeur"
-                              >
-                                <MoreVertical size={16} />
-                              </button>
-
-                              {activeMenuTeacherId === teacher.id && (
-                                <div
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="absolute right-0 top-10 z-50 w-44 bg-slate-900/95 text-white rounded-2xl shadow-2xl border border-white/10 p-1.5 space-y-1 backdrop-blur-xl animate-in fade-in zoom-in-95"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActiveMenuTeacherId(null);
-                                      handleOpenEditTeacher(teacher);
-                                    }}
-                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-200 hover:bg-white/10 transition-colors cursor-pointer"
-                                  >
-                                    <Edit3 size={15} className="text-sky-400" />
-                                    <span>Modifier</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActiveMenuTeacherId(null);
-                                      handleDeleteTeacherAction(teacher);
-                                    }}
-                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                                  >
-                                    <Trash2 size={15} className="text-rose-400" />
-                                    <span>Supprimer</span>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
                           </div>
 
-                          {/* Quick Actions Beneath Card - WhatsApp, Appel & Planning Enlarged */}
-                          <div className="w-[300px] max-w-full flex items-center gap-2 mt-2 px-0.5">
-                            {/* WhatsApp Button */}
+                          {/* Quick Actions Beneath Card - WhatsApp (Bouton entier sans ..), Appel & Planning */}
+                          <div className="w-[300px] max-w-full flex items-center gap-1.5 mt-2 px-0.5">
+                            {/* WhatsApp Button (Bouton entier sans points de suspension) */}
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOpenWhatsApp(teacher);
                               }}
-                              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl text-[13px] font-bold bg-[#25D366] hover:bg-[#20bd5a] text-white shadow-sm transition-all cursor-pointer active:scale-95 border border-[#25D366]"
+                              className="btn-whatsapp shrink-0 flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-2xl text-[13px] font-bold bg-[#25D366] hover:bg-[#20bd5a] text-white shadow-sm transition-all cursor-pointer active:scale-95 border border-[#25D366]"
+                              style={{ flexShrink: 0, minWidth: 'max-content' }}
                               title="Contacter sur WhatsApp"
+                              data-no-truncate="true"
                             >
                               <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
                                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                               </svg>
-                              <span>WhatsApp</span>
+                              <span 
+                                className="whitespace-nowrap font-bold text-white inline-block"
+                                style={{ overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }}
+                              >
+                                WhatsApp
+                              </span>
                             </button>
 
                             {/* Appel Button */}
@@ -1244,11 +1295,11 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                                 e.stopPropagation();
                                 setTeacherToCall(teacher);
                               }}
-                              className="flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-2xl text-[13px] font-bold bg-white hover:bg-slate-50 text-slate-700 hover:text-emerald-600 border border-slate-200 shadow-sm transition-all cursor-pointer active:scale-95"
+                              className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 px-2.5 rounded-2xl text-[12px] font-bold bg-white hover:bg-slate-50 text-slate-700 hover:text-emerald-600 border border-slate-200 shadow-sm transition-all cursor-pointer active:scale-95"
                               title="Appeler le professeur"
                             >
-                              <Phone size={15} />
-                              <span>Appel</span>
+                              <Phone size={14} className="shrink-0" />
+                              <span className="truncate">Appel</span>
                             </button>
 
                             {/* Planning Button */}
@@ -1259,11 +1310,11 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                                   e.stopPropagation();
                                   handleOpenSchedule(teacher);
                                 }}
-                                className="flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-2xl text-[13px] font-bold bg-sky-500 hover:bg-sky-600 text-white shadow-sm transition-all cursor-pointer active:scale-95"
+                                className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 px-2.5 rounded-2xl text-[12px] font-bold bg-sky-500 hover:bg-sky-600 text-white shadow-sm transition-all cursor-pointer active:scale-95"
                                 title="Voir Emploi du temps"
                               >
-                                <Calendar size={15} />
-                                <span>Planning</span>
+                                <Calendar size={14} className="shrink-0" />
+                                <span className="truncate">Planning</span>
                               </button>
                             )}
                           </div>
@@ -1985,6 +2036,18 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                     items={CLASSES.map(c => ({ label: c, value: c }))}
                     className="py-3 text-sm font-medium"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Code d'accréditation</label>
+                  <input
+                    type="text"
+                    value={editTeacherForm.accreditationCode}
+                    onChange={(e) => setEditTeacherForm({ ...editTeacherForm, accreditationCode: e.target.value.toUpperCase() })}
+                    placeholder="Ex: MATH-2024 ou code individuel"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm font-bold tracking-wider text-slate-800 uppercase"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">Ce code se synchronise en temps réel sur tous les appareils.</p>
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4">

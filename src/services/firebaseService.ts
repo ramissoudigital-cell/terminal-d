@@ -538,6 +538,9 @@ export const registerUserAccount = async (params: {
   childrenCount?: number;
   children?: Array<{ matricule: string; assignedClass: string; studentId?: string; name?: string }>;
   directorType?: 'Directeur des Études' | 'Directeur Exécutif' | string;
+  isPrincipal?: boolean;
+  isProfesseurPrincipal?: boolean;
+  principalClasses?: string[];
 }): Promise<User> => {
   const role = params.role || 'student';
   const isAdminRole = role === 'director' || role === 'educator' || role === 'cashier';
@@ -702,7 +705,10 @@ export const registerUserAccount = async (params: {
     accreditationCode: (role === 'teacher' || role === 'director') ? (params.accreditationCode || preProfile?.accreditationCode || '') : undefined,
     section: params.section || preProfile?.section || 'Secondaire',
     childrenCount: childrenCountToUse,
-    children: childrenToUse
+    children: childrenToUse,
+    isPrincipal: Boolean(params.isPrincipal || params.isProfesseurPrincipal || preProfile?.isPrincipal),
+    isProfesseurPrincipal: Boolean(params.isPrincipal || params.isProfesseurPrincipal || preProfile?.isPrincipal),
+    principalClasses: params.principalClasses || preProfile?.principalClasses || ((params.isPrincipal || params.isProfesseurPrincipal) ? [params.assignedClass || 'Terminale D1'] : [])
   };
 
   if (params.directorType || preProfile?.directorType) {
@@ -728,6 +734,9 @@ export const registerUserAccount = async (params: {
       ? params.assignedClasses 
       : (preProfile?.assignedClasses || (params.assignedClass ? [params.assignedClass] : ['Terminale D1']));
 
+    const isPP = Boolean(params.isPrincipal || params.isProfesseurPrincipal || preProfile?.isPrincipal);
+    const pClasses = params.principalClasses || preProfile?.principalClasses || (isPP ? [params.assignedClass || 'Terminale D1'] : []);
+
     const teacherDoc = {
       id: teacherId,
       name: name,
@@ -737,6 +746,9 @@ export const registerUserAccount = async (params: {
       subject: params.subject || preProfile?.subject || 'Mathématiques',
       accreditationCode: params.accreditationCode || preProfile?.accreditationCode || '',
       assignedClasses: teacherClasses,
+      isPrincipal: isPP,
+      isProfesseurPrincipal: isPP,
+      principalClasses: pClasses,
       status: 'Actif',
       uid: authUid,
       authUid: authUid,

@@ -1,7 +1,10 @@
 import { DailyScheduleMobileView } from './DailyScheduleMobileView';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, ChevronLeft, ChevronRight, MapPin, BookOpen, ArrowRight, ArrowLeft, Plus, Trash2, X, Save, Edit3, Lock, Clock, Search, FileText, User, GraduationCap, LayoutGrid, Table, Users, CheckCircle, Bell } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, MapPin, BookOpen, ArrowRight, ArrowLeft, Plus, Trash2, X, Save, Edit3, Lock, Clock, Search, FileText, User, GraduationCap, LayoutGrid, Table, Users, CheckCircle, Bell, Wifi } from 'lucide-react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../src/lib/firebase';
+import { saveRealtimeDocument } from '../src/services/firebaseService';
 import { mockClasses, mockTeachers } from '../data/mockData';
 import { ClassItem, getSubjectsForClass } from '../types';
 import { getParentChildren, isSameClass } from '../src/utils/parentUtils';
@@ -200,6 +203,7 @@ const getSubjectColor = (subject: string): string => {
         case 'EDHC': return 'bg-teal-100 border-teal-200 text-teal-700';
         case 'Devoir':
         case 'Devoirs':
+            return 'bg-rose-100 border-rose-300 text-rose-700';
         case 'Étude': return 'bg-gray-100 border-gray-200 text-gray-600';
         default: return 'bg-gray-50 border-gray-200 text-gray-700';
     }
@@ -244,6 +248,8 @@ export const getTerminaleD1Schedule = (roomName: string = 'Terminale D1'): Sched
         // MERCREDI (day: 2)
         // 07h30 - 09h20 (Slots 0 & 1, 2h): SVT - Mme.BAMBA
         { id: 'tle-d1-mer-svt', day: 2, start: 0, duration: 2, title: 'SVT', room: roomName, color: getSubjectColor('SVT'), teacherName: 'Mme.BAMBA' },
+        // 13h00 - 14h50 (Slots 6 & 7, 2h): Devoir Surveillé - Surveillant Général
+        { id: 'tle-d1-mer-devoir', day: 2, start: 6, duration: 2, title: 'Devoir', room: roomName, color: getSubjectColor('Devoir'), teacherName: 'Surveillant Général' },
 
         // JEUDI (day: 3)
         // 07h30 - 09h20 (Slots 0 & 1, 2h): Informatique - David Legrand
@@ -414,7 +420,7 @@ export const getStoredClassSchedule = (classId: number | string, className?: str
     try {
         const key = `school_schedule_${classId || className}`;
         const verKey = `school_schedule_ver_${classId || className}`;
-        const CURRENT_VERSION = 'v3_tled1_official';
+        const CURRENT_VERSION = 'v4_tled1_devoir';
         const saved = localStorage.getItem(key);
         const savedVer = localStorage.getItem(verKey);
 
@@ -432,12 +438,45 @@ export const getStoredClassSchedule = (classId: number | string, className?: str
     return sanitizeEventsForBreaks(generateClassSchedule(classId || className || 1, slots.length), slots);
 };
 
-export const saveClassSchedule = (classId: number | string, events: ScheduleEvent[], className?: string) => {
+export const saveClassSchedule = async (classId: number | string, events: ScheduleEvent[], className?: string) => {
     try {
         const key = `school_schedule_${classId || className}`;
+        const keyByName = className ? `school_schedule_${className}` : null;
+        const verKey = `school_schedule_ver_${classId || className}`;
+        const CURRENT_VERSION = 'v4_tled1_devoir';
+
         localStorage.setItem(key, JSON.stringify(events));
-        window.dispatchEvent(new CustomEvent('school_schedule_updated', { detail: { classId, className } }));
-    } catch (e) {}
+        if (keyByName) localStorage.setItem(keyByName, JSON.stringify(events));
+        localStorage.setItem(verKey, CURRENT_VERSION);
+
+        window.dispatchEvent(new CustomEvent('school_schedule_updated', { 
+            detail: { classId, className, events, source: 'local' } 
+        }));
+
+        // Real-time Firestore synchronization across all devices and phones
+        const docId = String(className || classId || 'terminale_d1').replace(/\s+/g, '_').toLowerCase();
+        const cleanEvents = (events || []).map(e => ({
+            id: String(e.id || Date.now()),
+            day: Number(e.day),
+            start: Number(e.start),
+            duration: Number(e.duration || 1),
+            title: String(e.title || ''),
+            room: String(e.room || ''),
+            color: String(e.color || ''),
+            customTime: String(e.customTime || ''),
+            teacherName: String(e.teacherName || '')
+        }));
+
+        await saveRealtimeDocument('schedules', docId, {
+            id: docId,
+            classId: String(classId),
+            className: className || '',
+            events: cleanEvents,
+            updatedAtIso: new Date().toISOString()
+        });
+    } catch (e) {
+        console.warn('Error saving class schedule to real-time storage:', e);
+    }
 };
 
 export const SchedulePage: React.FC<SchedulePageProps> = ({ allStudents, readOnly: propReadOnly, restrictedClass, currentUser, onNavigate, teachers, onClose }) => {
@@ -637,11 +676,76 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({ allStudents, readOnl
   useEffect(() => {
       const handleScheduleUpdate = (e: any) => {
           if (selectedClass && (e.detail?.classId === selectedClass.id || e.detail?.className === selectedClass.name)) {
-              setEvents(getStoredClassSchedule(selectedClass.id, selectedClass.name));
+              if (Array.isArray(e.detail?.events)) {
+                  const slots = getStoredTimeSlots(selectedClass.id, selectedClass.name);
+                  setEvents(sanitizeEventsForBreaks(e.detail.events, slots));
+              } else {
+                  setEvents(getStoredClassSchedule(selectedClass.id, selectedClass.name));
+              }
           }
       };
       window.addEventListener('school_schedule_updated', handleScheduleUpdate);
       return () => window.removeEventListener('school_schedule_updated', handleScheduleUpdate);
+  }, [selectedClass]);
+
+  // Real-time Firestore synchronization listener for class schedules across all phones
+  useEffect(() => {
+      if (!selectedClass) return;
+
+      const docId = String(selectedClass.name || selectedClass.id || 'terminale_d1').replace(/\s+/g, '_').toLowerCase();
+      
+      const unsubscribe = onSnapshot(doc(db, 'schedules', docId), (snapshot) => {
+          if (snapshot.exists()) {
+              const data = snapshot.data();
+              if (data && Array.isArray(data.events) && data.events.length > 0) {
+                  const slots = getStoredTimeSlots(selectedClass.id, selectedClass.name);
+                  const sanitized = sanitizeEventsForBreaks(data.events, slots);
+                  
+                  // Update state and local cache for this class in real time
+                  setEvents(sanitized);
+                  try {
+                      localStorage.setItem(`school_schedule_${selectedClass.id}`, JSON.stringify(sanitized));
+                      if (selectedClass.name) {
+                          localStorage.setItem(`school_schedule_${selectedClass.name}`, JSON.stringify(sanitized));
+                      }
+                      localStorage.setItem(`school_schedule_ver_${selectedClass.id}`, 'v4_tled1_devoir');
+                  } catch (e) {}
+              }
+          } else {
+              // If not in Firestore yet, automatically push initial schedule so it becomes interconnected
+              const initialEvents = getStoredClassSchedule(selectedClass.id, selectedClass.name);
+              if (initialEvents && initialEvents.length > 0) {
+                  saveClassSchedule(selectedClass.id, initialEvents, selectedClass.name);
+              }
+          }
+      }, (error) => {
+          console.warn('Realtime schedule listener notice:', error);
+      });
+
+      return () => unsubscribe();
+  }, [selectedClass]);
+
+  // Real-time Firestore synchronization for class time slots across all phones
+  useEffect(() => {
+      if (!selectedClass) return;
+      const slotDocId = String(selectedClass.name || selectedClass.id || 'default').replace(/\s+/g, '_').toLowerCase();
+
+      const unsubscribe = onSnapshot(doc(db, 'time_slots', slotDocId), (snapshot) => {
+          if (snapshot.exists()) {
+              const data = snapshot.data();
+              if (data && Array.isArray(data.slots) && data.slots.length > 0) {
+                  setTimeSlots(data.slots);
+                  try {
+                      localStorage.setItem(`school_time_slots_${selectedClass.id}`, JSON.stringify(data.slots));
+                      localStorage.setItem(`school_time_slots_${selectedClass.name}`, JSON.stringify(data.slots));
+                  } catch (e) {}
+              }
+          }
+      }, (error) => {
+          console.warn('Realtime time slots listener notice:', error);
+      });
+
+      return () => unsubscribe();
   }, [selectedClass]);
 
   // Handlers

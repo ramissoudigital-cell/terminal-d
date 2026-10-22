@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Save, User, Bell, Lock, Camera, CheckCircle, Shield, Smartphone, Mail, Eye, EyeOff, LogOut, Info, Sparkles, GraduationCap, ShieldCheck, Heart, HelpCircle, Globe, Code, CheckCircle2, Zap, Loader2, Trash2, ArrowLeft, BookOpen, KeyRound, RotateCcw, Search, Copy, Check } from 'lucide-react';
+import { Save, User, Bell, Lock, Camera, CheckCircle, Shield, Smartphone, Mail, Eye, EyeOff, LogOut, Info, Sparkles, GraduationCap, ShieldCheck, Heart, HelpCircle, Globe, Code, CheckCircle2, Zap, Loader2, Trash2, ArrowLeft, BookOpen, KeyRound, RotateCcw, Search, Copy, Check, Palette, Moon, Sun } from 'lucide-react';
 import { User as UserType } from '../types';
 import { compressImage, getDefaultAvatar, getRoleLabel } from '../src/utils/userUtils';
 import { BilanFinAnnee } from "./BilanFinAnnee";
@@ -17,6 +17,7 @@ import {
 } from '../src/utils/accreditationUtils';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../src/lib/firebase';
+import { saveRealtimeDocument } from '../src/services/firebaseService';
 
 interface SettingsPageProps {
     onLogout?: () => void;
@@ -36,6 +37,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
   const [isBilanOpen, setIsBilanOpen] = useState(false);
 
   const { permissionStatus, requestPermissionAndGetToken } = useNotifications();
+
+  // --- DARK MODE STATE ---
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('app_dark_mode') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('app_dark_mode', String(darkMode));
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   // --- PROFILE STATE ---
   const [profile, setProfile] = useState({
@@ -178,27 +193,44 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
         });
       }
 
-      // Sync to Firestore users collection
+      // Sync to Firestore users collection in real-time
       try {
         if (currentUser?.id) {
-          await updateDoc(doc(db, 'users', String(currentUser.id)), {
+          await saveRealtimeDocument('users', String(currentUser.id), {
             accreditationCode: formatted
-          }).catch(() => {});
+          });
         }
       } catch (e) {
         console.warn('Error updating accreditation in Firestore users:', e);
       }
 
-      // Sync to Firestore teachers collection
+      // Sync to Firestore teachers collection in real-time
       try {
         const teacherDocId = currentUser?.id && !String(currentUser.id).startsWith('PROF-')
           ? `PROF-${currentUser.id}`
           : String(currentUser?.id || '');
         if (teacherDocId) {
-          await updateDoc(doc(db, 'teachers', teacherDocId), {
+          await saveRealtimeDocument('teachers', teacherDocId, {
             accreditationCode: formatted
-          }).catch(() => {});
+          });
         }
+        if (currentUser?.id && String(currentUser.id) !== teacherDocId) {
+          await saveRealtimeDocument('teachers', String(currentUser.id), {
+            accreditationCode: formatted
+          });
+        }
+      } catch (e) {}
+
+      // Sync to global real-time accreditation_codes collection
+      try {
+        const accredKey = currentUser?.id ? String(currentUser.id) : (currentUser?.email ? currentUser.email.replace(/[^a-zA-Z0-9]/g, '_') : 'prof_accred');
+        await saveRealtimeDocument('accreditation_codes', accredKey, {
+          teacherId: currentUser?.id,
+          email: currentUser?.email,
+          subject: teacherUserSubject,
+          code: formatted,
+          updatedAt: Date.now()
+        });
       } catch (e) {}
 
       // Update school_user_session
@@ -218,11 +250,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
       setSubjectAccreditationCode(sub, formatted);
       setSubjectCodes(getAllSubjectAccreditationCodes());
       setEditingCodeValue(formatted);
+      // Sync subject accreditation code to Firestore in real-time
+      try {
+        await saveRealtimeDocument('accreditation_codes', `subject_${normalizeSubjectKey(sub)}`, {
+          subject: sub,
+          code: formatted,
+          updatedAt: Date.now()
+        });
+      } catch (e) {}
       handleSave(`Code d'accréditation pour ${sub} (${formatted})`);
     }
   };
 
-  const handleResetSubjectCode = (sub: string) => {
+  const handleResetSubjectCode = async (sub: string) => {
     const defaultCode = DEFAULT_SUBJECT_ACCREDITATION_CODES[sub] || `${sub.replace(/[^a-zA-Z]/g, '').substring(0, 4).toUpperCase()}-2024`;
     if (isTeacherRole && !isDirector) {
       setTeacherIndividualAccreditationCode(
@@ -236,11 +276,35 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
           accreditationCode: defaultCode
         });
       }
+      try {
+        if (currentUser?.id) {
+          await saveRealtimeDocument('users', String(currentUser.id), {
+            accreditationCode: defaultCode
+          });
+          await saveRealtimeDocument('teachers', String(currentUser.id), {
+            accreditationCode: defaultCode
+          });
+          await saveRealtimeDocument('accreditation_codes', String(currentUser.id), {
+            teacherId: currentUser.id,
+            email: currentUser.email,
+            subject: teacherUserSubject,
+            code: defaultCode,
+            updatedAt: Date.now()
+          });
+        }
+      } catch (e) {}
       handleSave(`Votre code individuel a été réinitialisé (${defaultCode})`);
     } else {
       setSubjectAccreditationCode(sub, defaultCode);
       setSubjectCodes(getAllSubjectAccreditationCodes());
       setEditingCodeValue(defaultCode);
+      try {
+        await saveRealtimeDocument('accreditation_codes', `subject_${normalizeSubjectKey(sub)}`, {
+          subject: sub,
+          code: defaultCode,
+          updatedAt: Date.now()
+        });
+      } catch (e) {}
       handleSave(`Code réinitialisé pour ${sub} (${defaultCode})`);
     }
   };
@@ -661,6 +725,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
         return (
           <PasswordView onBack={() => setActiveTab('security')} />
         );
+
 
       case 'about':
         return (
@@ -1161,6 +1226,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
                       localStorage.setItem('acc_niv3', accreditationCodes.niveau3);
                       localStorage.setItem('acc_niv4', accreditationCodes.niveau4);
                       localStorage.setItem('acc_niv5', accreditationCodes.niveau5);
+                      saveRealtimeDocument('accreditation_codes', 'system_levels', {
+                        niveau2: accreditationCodes.niveau2,
+                        niveau3: accreditationCodes.niveau3,
+                        niveau4: accreditationCodes.niveau4,
+                        niveau5: accreditationCodes.niveau5,
+                        updatedAt: Date.now()
+                      }).catch(console.error);
                       handleSave('Codes d\'Accréditation de Niveau');
                   }}
                   className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition-all active:scale-95 w-fit cursor-pointer"
@@ -1264,6 +1336,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
                       onClick={() => setActiveTab('accreditation')}
                    />
                  )}
+
                  <SettingsItem 
                     icon={<Info size={18} />} 
                     label="À propos de l'application" 

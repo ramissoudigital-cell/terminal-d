@@ -1109,10 +1109,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
     currentUser?.role === 'educator' || 
     currentUser?.role === 'éducateur' || 
     currentUser?.role === 'cashier' || 
+    isTeacherRole ||
     currentUser?.accessLevel === 2 || 
+    currentUser?.accessLevel === 3 || 
     currentUser?.accessLevel === 5 || 
     currentUser?.accessLevel === 4
-  ) && currentUser?.role !== 'teacher' && currentUser?.role !== 'parent' && currentUser?.role !== 'student';
+  ) && currentUser?.role !== 'parent' && currentUser?.role !== 'student';
 
   const canSignTeacherSignature = isAdminOrDirector || isPrincipalForClass || isTeacherRole;
   const canEditAppreciation = isAdminOrDirector || isPrincipalForClass || isTeacherRole;

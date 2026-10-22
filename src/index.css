@@ -91,3 +91,115 @@ html, body, #root {
   }
 }
 
+/* ========================================================
+   ANTI-SUPERPOSITION & SINGLE-LINE ELLIPSIS ARCHITECTURE
+   Empêche le texte de se superposer en dessous sur petit écran.
+   Si la place manque, le texte reste sur la MÊME LIGNE et 
+   affiche des points de suspension (...) automatiquement.
+   Si la place est suffisante, le texte s'affiche en entier.
+   ======================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Permettre aux éléments flex et grille de rétrécir sous la largeur intrinsèque pour que ellipsis fonctionne */
+.flex > *,
+.inline-flex > *,
+.grid > * {
+  min-width: 0;
+}
+
+/* Ne pas compresser les icônes ni les images */
+svg, img, [data-shrink-none], .shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Classes utilitaires pour forcer une seule ligne avec points de suspension si débordement */
+.single-line-ellipsis,
+.truncate-ellipsis,
+.nowrap-dots {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+}
+
+/* Protection responsive contre la superposition de textes sur petit écran */
+@media screen and (max-width: 768px) {
+  /* Titres : restent sur une seule ligne avec '...' si et seulement si l'espace manque */
+  h1:not(.multiline):not(.whitespace-normal),
+  h2:not(.multiline):not(.whitespace-normal),
+  h3:not(.multiline):not(.whitespace-normal),
+  h4:not(.multiline):not(.whitespace-normal),
+  h5:not(.multiline):not(.whitespace-normal),
+  h6:not(.multiline):not(.whitespace-normal) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  /* Sous-titres d'en-tête de page */
+  .page-header p,
+  header p:not(.multiline),
+  [role="banner"] p:not(.multiline) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  /* Cellules de tableau : pas de superposition verticale */
+  td:not(.multiline):not(.whitespace-normal),
+  th:not(.multiline):not(.whitespace-normal) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Badges et pilules d'état : ne doivent jamais casser sur 2 lignes */
+  span[class*="rounded-full"]:not(.multiline):not(.whitespace-normal),
+  span[class*="rounded-xl"]:not(.multiline):not(.whitespace-normal),
+  span[class*="rounded-2xl"]:not(.multiline):not(.whitespace-normal) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Exceptions obligatoires pour textes éditables et paragraphes multi-lignes */
+textarea,
+input,
+.multiline,
+.whitespace-normal,
+.break-words,
+.prose,
+p.multiline,
+div.multiline,
+span.multiline,
+[contenteditable="true"] {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+textarea {
+  white-space: pre-wrap !important;
+}
+
+/* Protection spécifique : Ne JAMAIS tronquer le bouton WhatsApp (Bouton entier sans ..) */
+.btn-whatsapp,
+.btn-whatsapp *,
+[data-no-truncate],
+[data-no-truncate] * {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  min-width: max-content !important;
+  flex-shrink: 0 !important;
+  max-width: none !important;
+}
+
+
+

@@ -1,4 +1,5 @@
 import { cleanUtf8, cleanObjectUtf8, isSameSubject } from '../src/utils/encodingUtils';
+import { saveRealtimeDocument, deleteRealtimeDocument } from '../src/services/firebaseService';
 
 export interface ClassExercise {
   id: string;
@@ -99,10 +100,22 @@ if (typeof window !== 'undefined') {
   clearAllDefaultExercises();
 }
 
+export const isMatchingClass = (keyClass: string, targetClass: string): boolean => {
+  if (!keyClass || !targetClass) return false;
+  const k = cleanUtf8(keyClass).trim().toLowerCase().replace(/\s+/g, '');
+  const t = cleanUtf8(targetClass).trim().toLowerCase().replace(/\s+/g, '');
+  if (k === t) return true;
+
+  // Terminale D cross-matching: Terminale D, Terminale D1, Terminale D2, Tle D, Terminale
+  const isTerminalK = k.includes('terminaled') || k.includes('tled') || k === 'terminale' || k.startsWith('terminaled');
+  const isTerminalT = t.includes('terminaled') || t.includes('tled') || t === 'terminale' || t.startsWith('terminaled');
+  if (isTerminalK && isTerminalT) return true;
+
+  return false;
+};
+
 export const getExercisesForClass = (className: string): ClassExercise[] => {
   if (!className) return [];
-  const normalizedClass = cleanUtf8(className).trim().toLowerCase();
-  const normalizedClassNoSpace = normalizedClass.replace(/\s+/g, '');
 
   const results: ClassExercise[] = [];
   const seenIds = new Set<string>();
@@ -111,10 +124,7 @@ export const getExercisesForClass = (className: string): ClassExercise[] => {
     const saved = localStorage.getItem(`school_exercises_db`);
     if (saved) {
       const all: Record<string, ClassExercise[]> = JSON.parse(saved);
-      const matchedKeys = Object.keys(all).filter(k => {
-        const cleanK = cleanUtf8(k).trim().toLowerCase();
-        return cleanK === normalizedClass || cleanK.replace(/\s+/g, '') === normalizedClassNoSpace;
-      });
+      const matchedKeys = Object.keys(all).filter(k => isMatchingClass(k, className));
 
       for (const k of matchedKeys) {
         if (Array.isArray(all[k])) {
@@ -136,10 +146,7 @@ export const getExercisesForClass = (className: string): ClassExercise[] => {
     const savedSupplies = localStorage.getItem(`school_supplies_store`);
     if (savedSupplies) {
       const allSupplies: Record<string, any[]> = JSON.parse(savedSupplies);
-      const matchedSupplyKeys = Object.keys(allSupplies).filter(k => {
-        const cleanK = cleanUtf8(k).trim().toLowerCase();
-        return cleanK === normalizedClass || cleanK.replace(/\s+/g, '') === normalizedClassNoSpace;
-      });
+      const matchedSupplyKeys = Object.keys(allSupplies).filter(k => isMatchingClass(k, className));
 
       for (const sk of matchedSupplyKeys) {
         const supplies = allSupplies[sk] || [];
@@ -240,6 +247,9 @@ export const saveExerciseToClass = (exercise: ClassExercise): void => {
     // Realtime custom event dispatch
     window.dispatchEvent(new CustomEvent('exercises-updated', { detail: { className: matchedKey, exercise: cleanEx } }));
     window.dispatchEvent(new Event('storage'));
+
+    // Realtime Firestore synchronization
+    saveRealtimeDocument('class_exercises', cleanEx.id, cleanEx).catch(console.error);
   } catch (e) {
     console.error("Error saving exercise", e);
   }
@@ -247,15 +257,12 @@ export const saveExerciseToClass = (exercise: ClassExercise): void => {
 
 export const deleteExerciseFromClass = (id: string, className: string): void => {
   try {
-    const cleanClass = cleanUtf8(className).trim().toLowerCase();
-    const cleanClassNoSpace = cleanClass.replace(/\s+/g, '');
     const saved = localStorage.getItem(`school_exercises_db`);
     const all: Record<string, ClassExercise[]> = saved ? JSON.parse(saved) : {};
     
     let changed = false;
     Object.keys(all).forEach(k => {
-      const cleanK = cleanUtf8(k).trim().toLowerCase();
-      if (cleanK === cleanClass || cleanK.replace(/\s+/g, '') === cleanClassNoSpace) {
+      if (isMatchingClass(k, className)) {
         if (Array.isArray(all[k])) {
           const prevLen = all[k].length;
           all[k] = all[k].filter(e => e.id !== id);
@@ -268,6 +275,8 @@ export const deleteExerciseFromClass = (id: string, className: string): void => 
       localStorage.setItem(`school_exercises_db`, JSON.stringify(all));
     }
 
+    deleteRealtimeDocument('class_exercises', id).catch(console.error);
+
     // Also delete from school_supplies_store
     try {
       const savedSupplies = localStorage.getItem(`school_supplies_store`);
@@ -275,8 +284,7 @@ export const deleteExerciseFromClass = (id: string, className: string): void => 
         const allSupplies: Record<string, any[]> = JSON.parse(savedSupplies);
         let sChanged = false;
         Object.keys(allSupplies).forEach(sk => {
-          const cleanK = cleanUtf8(sk).trim().toLowerCase();
-          if (cleanK === cleanClass || cleanK.replace(/\s+/g, '') === cleanClassNoSpace) {
+          if (isMatchingClass(sk, className)) {
             if (Array.isArray(allSupplies[sk])) {
               const pLen = allSupplies[sk].length;
               allSupplies[sk] = allSupplies[sk].filter(s => s.id !== id);

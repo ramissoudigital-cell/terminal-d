@@ -283,9 +283,6 @@ export const StudentExercisesModal: React.FC<StudentExercisesModalProps> = ({
                   <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
                     Exercices par Matière
                   </h2>
-                  <span className="bg-blue-500/30 text-blue-200 text-xs px-2.5 py-0.5 rounded-full font-bold border border-blue-400/30">
-                    {student?.class || 'Classe'}
-                  </span>
                 </div>
                 <p className="text-xs sm:text-sm text-blue-200/80 font-medium mt-0.5">
                   Banque d'entraînement et sujets d'évaluation pour <span className="font-bold text-white">{student?.name}</span>

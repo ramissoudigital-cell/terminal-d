@@ -1,9 +1,25 @@
 import React, { useState, useRef } from 'react';
 import { compressImage } from '../src/utils/userUtils';
-import { PenLine, Trash2, Shield, Globe, Award, Sparkles, Phone, UserCheck, Wifi, Eye, CheckCircle2, CreditCard, Clock, ArrowRight, MessageSquare, Send, Camera } from 'lucide-react';
+import { 
+  PenLine, 
+  Trash2, 
+  Phone, 
+  CheckCircle2, 
+  CreditCard, 
+  Clock, 
+  ArrowRight, 
+  MessageSquare, 
+  Camera, 
+  Copy, 
+  Check, 
+  ShieldCheck,
+  RotateCw
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Student } from '../types';
 import { getCountryConfig } from '../data/countries';
+import TiltedCard, { TiltedCardLayer } from './TiltedCard';
+import ReflectiveCard from './ReflectiveCard';
 
 interface StudentCardSliderProps {
   student?: Student;
@@ -23,16 +39,18 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
   onDelete,
   onPhotoChange,
   readOnly = false,
-  schoolName = 'Collège Faoummaba',
+  schoolName = 'COLLÈGE FAOUMMABA',
   onNavigate,
   hideTuitionCard = false,
   currentUser
 }) => {
   const [activeIndex, setActiveIndex] = useState<number>(0);
+  const [isCardFlipped, setIsCardFlipped] = useState<boolean>(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [localPhotoUrl, setLocalPhotoUrl] = useState<string | null>(null);
   const [photoSavedMessage, setPhotoSavedMessage] = useState<string | null>(null);
+  const [copiedPhone, setCopiedPhone] = useState(false);
 
   React.useEffect(() => {
     setLocalPhotoUrl(null);
@@ -42,7 +60,6 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       try {
-        // Compress the image before saving (crucial for phone cameras to avoid exceeding Firestore 1MB limit)
         const dataUrl = await compressImage(file, 400, 400, 0.85);
         setLocalPhotoUrl(dataUrl);
 
@@ -50,7 +67,6 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
           student.photoUrl = dataUrl;
         }
 
-        // Automatic Persistence Steps
         // 1. Update in school_db_students in localStorage
         const savedStudentsStr = localStorage.getItem('school_db_students');
         let realStudentId: string | number | undefined = student?.id;
@@ -100,7 +116,7 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
           }
         });
 
-        // 3. Save to Firestore real-time 'students' collection (only if valid, non-mock ID)
+        // 3. Save to Firestore real-time 'students' collection
         if (student && realStudentId && String(realStudentId) !== '1') {
           const { saveRealtimeDocument } = await import('../src/services/firebaseService');
           await saveRealtimeDocument('students', String(realStudentId), {
@@ -138,7 +154,7 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
         }));
 
         // 6. Show toast notification
-        setPhotoSavedMessage('Photo sauvegardée automatiquement !');
+        setPhotoSavedMessage('Photo mise à jour avec succès !');
         setTimeout(() => {
           setPhotoSavedMessage(null);
         }, 3500);
@@ -149,11 +165,20 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
 
       } catch (err: any) {
         console.warn("Auto-save student photo failed:", err);
-        alert(err.message || "Erreur lors du traitement de la photo");
       }
     }
     if (e.target) {
       e.target.value = '';
+    }
+  };
+
+  const handleCopyPhone = (e: React.MouseEvent, phoneToCopy?: string) => {
+    e.stopPropagation();
+    const phone = phoneToCopy || student?.studentPhone || student?.parentPhone || '+225 07 00 00 00 00';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(phone);
+      setCopiedPhone(true);
+      setTimeout(() => setCopiedPhone(false), 2000);
     }
   };
 
@@ -173,7 +198,6 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
 
   const isTeacher = userRole === 'teacher' || userRole === 'professeur' || userAccessLevel === 3;
   const shouldHideTuition = Boolean(hideTuitionCard || isTeacher);
-
   const totalCards = shouldHideTuition ? 1 : 2;
 
   React.useEffect(() => {
@@ -269,81 +293,26 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
 
   const tuitionInfo = getTuitionInfo(student);
 
-  const getCardTheme = (className: string) => {
-    const c = (className || '').toLowerCase();
-    
-    if (c.includes('6ème') || c.includes('5ème')) {
-      return {
-        bgMain: 'bg-[#0ea5e9]',
-        bgAccent: 'bg-[#eab308]',
-        border1: 'border-[#ca8a04]/10',
-        border2: 'border-[#ca8a04]/5',
-        textRight: 'text-white',
-        pillBg: 'bg-white/25 text-white border-white/20 backdrop-blur-md',
-        photoBorder: 'border-white/40',
-        genderBg: 'bg-white/20 text-white border-white/30 backdrop-blur-md'
-      };
-    }
-    if (c.includes('4ème') || c.includes('3ème')) {
-      return {
-        bgMain: 'bg-emerald-400',
-        bgAccent: 'bg-white',
-        border1: 'border-emerald-50',
-        border2: 'border-emerald-50/50',
-        textRight: 'text-[#38BDF8]',
-        pillBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-        photoBorder: 'border-slate-200',
-        genderBg: 'bg-slate-100 border-slate-200 text-slate-700'
-      };
-    }
-    if (c.includes('2nde') || c.includes('seconde') || c.includes('1ère') || c.includes('première') || c.includes('1ere')) {
-      return {
-        bgMain: 'bg-sky-400',
-        bgAccent: 'bg-white',
-        border1: 'border-sky-50',
-        border2: 'border-sky-50/50',
-        textRight: 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]',
-        pillBg: 'bg-white/20 text-white border-white/40 backdrop-blur-md drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]',
-        photoBorder: 'border-white/50',
-        genderBg: 'bg-white/20 text-white border-white/40 backdrop-blur-md'
-      };
-    }
-    if (c.includes('tle') || c.includes('terminale')) {
-      return {
-        bgMain: 'bg-indigo-500',
-        bgAccent: 'bg-white',
-        border1: 'border-indigo-50',
-        border2: 'border-indigo-50/50',
-        textRight: 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]',
-        pillBg: 'bg-white/40 text-white border-white/50 backdrop-blur-md drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]',
-        photoBorder: 'border-white/50',
-        genderBg: 'bg-white/40 text-white border-white/50 backdrop-blur-md'
-      };
-    }
-    return {
-      bgMain: 'bg-[#0ea5e9]',
-      bgAccent: 'bg-[#eab308]',
-      border1: 'border-[#ca8a04]/10',
-      border2: 'border-[#ca8a04]/5',
-      textRight: 'text-white',
-      pillBg: 'bg-white/25 text-white border-white/20 backdrop-blur-md',
-      photoBorder: 'border-white/40',
-      genderBg: 'bg-white/20 text-white border-white/30 backdrop-blur-md'
-    };
-  };
-
-  const theme = getCardTheme(student.class);
-
   const getCardTitle = () => {
     switch (activeIndex) {
       case 0:
-        return 'Carte Étudiant';
+        return isCardFlipped ? 'Carte Étudiant (Verso)' : 'Carte Étudiant';
       case 1:
         return 'Situation Scolarité';
       default:
         return 'Carte Étudiant';
     }
   };
+
+  const displayMatricule = student.studentId || (student as any).matricule || '18221955X';
+  const displayBirthDate = student.birthDate || '2006-07-10';
+  const displayBirthPlace = student.birthPlace || 'Abidjan';
+  const displayName = student.name || 'AKIAHI SEKA JASMIN';
+  const displayClass = student.class || 'Terminale D1';
+  const displayGender = student.gender || 'M';
+  const isAffecte = student.assignedStatus !== 'non_affecte';
+  const displayPhoto = localPhotoUrl || student.photoUrl || (student as any).photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop';
+  const displaySchool = schoolName || 'COLLÈGE FAOUMMABA';
 
   return (
     <div className="w-full select-none">
@@ -354,15 +323,17 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
         className="hidden" 
         onChange={handlePhotoSelect} 
       />
+
       {/* Header title & controls */}
       <div className="flex justify-between items-center mb-3 px-1">
-        <div className="flex items-center gap-2">
-          <h2 className="text-slate-900 text-lg md:text-xl font-bold tracking-wide">
+        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+          <h2 className="text-slate-900 text-lg md:text-xl font-black tracking-wide truncate">
             {getCardTitle()}
           </h2>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 shrink-0">
             {activeIndex + 1} / {totalCards}
           </span>
+          {/* Flip button removed */}
         </div>
 
         <div className="flex items-center gap-2">
@@ -388,7 +359,7 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
       </div>
 
       {/* Main Card Slider Container */}
-      <div className="relative w-full aspect-[1.58/1] min-h-[220px] rounded-3xl overflow-hidden shadow-xl group">
+      <div className="relative w-full aspect-[1.58/1] min-h-[224px] rounded-3xl group">
         <AnimatePresence>
           {photoSavedMessage && (
             <motion.div
@@ -407,195 +378,51 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
         <div className="relative w-full h-full">
           <AnimatePresence mode="wait">
             {activeIndex === 0 && (
-              /* CARD 1: CARTE ÉTUDIANT */
+              /* CARD 1: CARTE ÉTUDIANT (ReflectiveCard horizontal bleu clair #BFDBFE) */
               <motion.div
                 key="card-student"
                 initial={{ opacity: 0, x: -60 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 60 }}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
-                drag="x"
-                dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.2}
-                onDragEnd={(_, info) => {
-                  if (info.offset.x < -30) nextCard();
-                  if (info.offset.x > 30) prevCard();
-                }}
-                onClick={(e) => {
-                  nextCard();
-                }}
-                className="absolute inset-0 w-full h-full rounded-3xl overflow-hidden cursor-grab active:cursor-grabbing"
+                className="w-full h-full"
               >
-                {(() => {
-                  const isTerminale = (student.class || '').toLowerCase().includes('tle') || (student.class || '').toLowerCase().includes('terminale');
-                  const isSecondeOrPremiere = (student.class || '').toLowerCase().includes('2nde') || (student.class || '').toLowerCase().includes('seconde') || (student.class || '').toLowerCase().includes('1ère') || (student.class || '').toLowerCase().includes('1ere') || (student.class || '').toLowerCase().includes('première') || (student.class || '').toLowerCase().includes('premiere');
-                  
-                  return (
-                    <>
-                      {/* Background Styling */}
-                      {isTerminale ? (
-                        <div 
-                          className="absolute inset-0"
-                          style={{ 
-                            background: 'linear-gradient(132deg, #9CB7F5 0%, #D2D5F8 48%, #F7E4FA 100%)',
-                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.4)',
-                          }}
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
-                        </div>
-                      ) : isSecondeOrPremiere ? (
-                        <div className="absolute inset-0 bg-[#2563eb]">
-                          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 440 277" preserveAspectRatio="none">
-                            <defs>
-                              <linearGradient id="base-bg-blue" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stopColor="#2563eb" /> 
-                                <stop offset="40%" stopColor="#3b82f6" />
-                                <stop offset="70%" stopColor="#60a5fa" />
-                                <stop offset="100%" stopColor="#bfdbfe" />
-                              </linearGradient>
-
-                              <linearGradient id="beam1-blue" x1="0" y1="180" x2="220" y2="0" gradientUnits="userSpaceOnUse">
-                                <stop offset="0%" stopColor="#dbeafe" stopOpacity="0.9" />
-                                <stop offset="100%" stopColor="#ffffff" stopOpacity="0.1" />
-                              </linearGradient>
-
-                              <linearGradient id="beam2-blue" x1="0" y1="277" x2="300" y2="0" gradientUnits="userSpaceOnUse">
-                                <stop offset="0%" stopColor="#1e3a8a" stopOpacity="1" />
-                                <stop offset="50%" stopColor="#2563eb" stopOpacity="0.7" />
-                                <stop offset="100%" stopColor="#60a5fa" stopOpacity="0" />
-                              </linearGradient>
-
-                              <radialGradient id="top-left-texture-blue" cx="20%" cy="20%" r="40%">
-                                <stop offset="0%" stopColor="#dbeafe" stopOpacity="0.7" />
-                                <stop offset="100%" stopColor="#dbeafe" stopOpacity="0" />
-                              </radialGradient>
-
-                              <pattern id="halftone-dots-blue" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                                <circle cx="2" cy="2" r="1.5" fill="#1e3a8a" opacity="0.4" />
-                              </pattern>
-
-                              <linearGradient id="dot-mask-blue" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="60%" stopColor="transparent" />
-                                <stop offset="100%" stopColor="black" />
-                              </linearGradient>
-                            </defs>
-
-                            <rect width="440" height="277" fill="url(#base-bg-blue)" />
-                            <rect width="440" height="277" fill="url(#halftone-dots-blue)" mask="url(#dot-mask-blue)" />
-                            <rect width="440" height="277" fill="url(#top-left-texture-blue)" style={{ mixBlendMode: 'screen' }} />
-                            <path d="M 0,180 L 300,277 L 0,277 Z" fill="#1e3a8a" opacity="0.85" style={{ mixBlendMode: 'multiply' }} />
-                            <polygon points="0,170 230,0 300,0 0,220" fill="url(#beam1-blue)" style={{ mixBlendMode: 'overlay' }} />
-                            <polygon points="0,180 230,0 240,0 0,190" fill="#60a5fa" opacity="0.7" />
-                            <path d="M 0,277 L 280,0 L 360,0 L 150,277 Z" fill="url(#beam2-blue)" style={{ mixBlendMode: 'hard-light' }} opacity="0.8" />
-                            <path d="M 120,277 C 220,200 240,100 180,-10 C 130,80 90,180 -20,240 Z" fill="#93c5fd" opacity="0.4" style={{ mixBlendMode: 'screen' }} />
-                            <path d="M 0,220 Q 100,210 200,240 T 440,230" fill="none" stroke="#bfdbfe" strokeWidth="2" opacity="0.4" style={{ mixBlendMode: 'overlay' }} />
-                            <path d="M 0,240 Q 120,230 220,260 T 440,250" fill="none" stroke="#dbeafe" strokeWidth="1.5" opacity="0.3" style={{ mixBlendMode: 'overlay' }} />
-                            <rect width="440" height="2" fill="white" opacity="0.2" />
-                          </svg>
-                          <div className="absolute inset-0 shadow-[inset_0_0_15px_rgba(255,255,255,0.15)] rounded-3xl pointer-events-none border border-white/20"></div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className={`absolute inset-0 ${theme.bgMain}`}></div>
-                          <div
-                            className={`absolute inset-y-0 right-0 w-[65%] ${theme.bgAccent}`}
-                            style={{ borderTopLeftRadius: '200px', borderBottomLeftRadius: '40px' }}
-                          >
-                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[240px] h-[240px] rounded-full border-[30px] ${theme.border1}`}></div>
-                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[160px] h-[160px] rounded-full border-[30px] ${theme.border2}`}></div>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Content Layer */}
-                      <div className={`relative z-10 w-full h-full p-5 flex flex-col justify-between ${isTerminale || isSecondeOrPremiere ? 'text-white' : 'text-white'}`}>
-
-                  {/* Top Row */}
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className={`${isTerminale || isSecondeOrPremiere ? 'text-white' : 'text-slate-800 md:text-white'} font-bold text-xs md:text-sm tracking-wider pt-1 uppercase drop-shadow-sm`}>
-                        {schoolName}
-                      </h3>
-                      <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-600/90 text-white border border-white/20 mt-1 shadow-sm">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-200 animate-pulse"></span>
-                        {student.assignedStatus === 'non_affecte' ? 'Non Affecté' : 'Affecté (État)'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shadow-sm ${theme.genderBg}`}>
-                        {student.gender || 'M'}
-                      </div>
-                      <div 
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          if (!readOnly) {
-                            photoInputRef.current?.click();
-                          } else if (onEdit) {
-                            onEdit();
-                          }
-                        }}
-                        className={`w-14 h-14 md:w-16 md:h-16 rounded-full border-2 overflow-hidden bg-white shrink-0 shadow-md ${theme.photoBorder} relative group cursor-pointer`}
-                        title="Cliquer pour changer la photo"
-                      >
-                        <img
-                          src={localPhotoUrl || student.photoUrl || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&h=256&q=80'}
-                          alt={student.name}
-                          className="w-full h-full object-cover"
-                        />
-                        {!readOnly && (
-                          <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-center p-1">
-                            <Camera size={16} />
-                            <span className="text-[8px] font-bold mt-0.5 leading-none">Changer</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Middle / Bottom Row */}
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <div className="mb-2">
-                        <p className={`${isTerminale || isSecondeOrPremiere ? 'text-white/80' : 'text-slate-800 md:text-white/75'} text-[9px] font-bold tracking-widest uppercase mb-0.5`}>MATRICULE</p>
-                        <p className={`${isTerminale || isSecondeOrPremiere ? 'text-white' : 'text-slate-800 md:text-white'} font-mono font-bold text-sm md:text-base tracking-wider drop-shadow-sm`}>
-                          {student.studentId}
-                        </p>
-                      </div>
-                      <div className="flex gap-4">
-                        <div>
-                          <p className={`${isTerminale || isSecondeOrPremiere ? 'text-white/80' : 'text-slate-800 md:text-white/75'} text-[9px] font-bold tracking-widest uppercase mb-0.5`}>NÉ(E) LE</p>
-                          <p className={`${isTerminale || isSecondeOrPremiere ? 'text-white' : 'text-slate-800 md:text-white'} font-bold text-xs md:text-sm drop-shadow-sm leading-tight`}>{student.birthDate}</p>
-                          <p className={`${isTerminale || isSecondeOrPremiere ? 'text-white/80' : 'text-slate-800 md:text-white/75'} text-[9px] font-bold tracking-widest uppercase mt-1.5 mb-0.5`}>LIEU DE NAISSANCE</p>
-                          <p className={`${isTerminale || isSecondeOrPremiere ? 'text-white' : 'text-slate-800 md:text-white'} font-bold text-[11px] md:text-xs drop-shadow-sm leading-tight truncate max-w-[130px]`}>
-                            {student.birthPlace || 'Abidjan'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <h2 className={`font-bold text-base md:text-lg mb-1 drop-shadow-sm leading-tight ${theme.textRight}`}>
-                        {student.name}
-                      </h2>
-                      <span className={`inline-block text-xs font-semibold px-3 py-1 rounded-lg border ${theme.pillBg}`}>
-                        {student.class}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                </>
-                  );
-                })()}
+                <ReflectiveCard
+                  className="reflective-card--horizontal"
+                  name={displayName}
+                  role={displayClass}
+                  badge={displaySchool || 'Collège Fatoumaba'}
+                  status={isAffecte ? 'Affecté (État)' : 'Non Affecté'}
+                  statusColor={isAffecte ? '#22c55e' : '#f59e0b'}
+                  idLabel="Matricule"
+                  idValue={displayMatricule}
+                  avatar={displayPhoto}
+                  onAvatarClick={!readOnly ? () => photoInputRef.current?.click() : undefined}
+                  webcam={false}
+                  theme="blue"
+                  tint="#BFDBFE"
+                  metalness={0.9}
+                  roughness={0.25}
+                  blurStrength={6}
+                  shine={1.2}
+                  glare={0.6}
+                  grayscale={0}
+                  warp={0.5}
+                  warpScale={1}
+                  bevel={3}
+                  tiltStrength={12}
+                  radius={24}
+                  enableTilt={true}
+                  intro
+                  width="100%"
+                  height="100%"
+                  onClick={!readOnly && onEdit ? onEdit : undefined}
+                />
               </motion.div>
             )}
 
             {activeIndex === 1 && !shouldHideTuition && (
-              /* CARD 2: SITUATION SCOLARITÉ / FRAIS D'ÉTUDES */
+              /* CARD 2: SITUATION SCOLARITÉ / FRAIS D'ÉTUDES (Carte Crédit Bleu Clair #BFDBFE) */
               <motion.div
                 key="card-tuition"
                 initial={{ opacity: 0, x: 60 }}
@@ -609,134 +436,180 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
                   if (info.offset.x < -30) nextCard();
                   if (info.offset.x > 30) prevCard();
                 }}
-                className="absolute inset-0 w-full h-full rounded-3xl overflow-hidden shadow-2xl bg-[#BFDBFE] text-slate-900 border-2 border-blue-300"
+                className="w-full h-full"
               >
-                {/* Background decorative gradients */}
-                <div className="absolute top-0 right-0 w-48 h-48 bg-blue-400/20 rounded-full filter blur-2xl pointer-events-none"></div>
-                <div className="absolute bottom-0 left-0 w-40 h-40 bg-indigo-400/20 rounded-full filter blur-xl pointer-events-none"></div>
+                <TiltedCard
+                  containerWidth="100%"
+                  containerHeight="100%"
+                  imageWidth="100%"
+                  imageHeight="100%"
+                  radius={28}
+                  rotateAmplitude={12}
+                  scaleOnHover={1.02}
+                  glare={0.4}
+                  shadow={0.35}
+                  gyroscope={true}
+                  className="w-full h-full"
+                >
+                  <div 
+                    className="relative w-full h-full rounded-3xl overflow-hidden text-slate-900 p-3.5 md:p-4 flex flex-col justify-between border-2 border-[#93c5fd] shadow-[0_20px_45px_-15px_rgba(29,78,216,0.3),0_0_24px_rgba(191,219,254,0.7)] select-none"
+                    style={{
+                      background: 'linear-gradient(135deg, #ffffff 0%, #e0f2fe 30%, #BFDBFE 68%, #93c5fd 100%)',
+                      boxShadow: 'inset 0 1px 2px rgba(255, 255, 255, 0.95), inset 0 -2px 8px rgba(59, 130, 246, 0.2)'
+                    }}
+                  >
+                    {/* Glossy diagonal sheen reflection */}
+                    <div 
+                      className="absolute -top-[120%] -left-[50%] w-[200%] h-[200%] pointer-events-none rotate-[28deg] opacity-35"
+                      style={{
+                        background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.4) 48%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0.4) 52%, transparent 100%)'
+                      }}
+                    />
+                    
+                    {/* Ambient light orbs */}
+                    <div className="absolute -top-12 -right-12 w-48 h-48 bg-sky-300/40 rounded-full filter blur-2xl pointer-events-none" />
+                    <div className="absolute -bottom-10 -left-10 w-44 h-44 bg-blue-300/30 rounded-full filter blur-xl pointer-events-none" />
 
-                {/* Content Layer */}
-                <div className="relative z-10 w-full h-full p-3.5 md:p-4 flex flex-col justify-between">
-                  {/* Header */}
-                  <div className="flex justify-between items-center border-b border-blue-300/80 pb-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-blue-700 text-white flex items-center justify-center shrink-0 shadow-sm">
-                        {tuitionInfo.isSolde ? <CheckCircle2 size={16} /> : <CreditCard size={16} />}
-                      </div>
-                      <div>
-                        <h3 className="text-blue-950 font-black text-xs md:text-sm tracking-wider uppercase">
-                          SITUATION SCOLARITÉ
-                        </h3>
-                        <p className="text-blue-800 font-bold text-[8px] md:text-[9px] uppercase">
-                          ANNÉE SCOLAIRE 2025-2026
-                        </p>
-                      </div>
-                    </div>
+                    {/* Content Layer */}
+                    <div className="relative z-10 w-full h-full flex flex-col justify-between">
+                      {/* Top Bar: Brand, EMV Chip & NFC Wave + Status Badge */}
+                      <div className="flex justify-between items-start border-b border-blue-900/15 pb-2">
+                        <div className="flex items-center gap-2.5">
+                          {/* Gold Metallic EMV Smart Chip */}
+                          <div className="w-9 h-7 rounded-md bg-gradient-to-tr from-amber-500 via-yellow-200 to-amber-600 border border-amber-300/90 shadow-md p-0.5 relative overflow-hidden flex items-center justify-center shrink-0">
+                            <div className="w-full h-full border border-amber-600/40 rounded-[3px] grid grid-cols-2 grid-rows-2 gap-[1px]">
+                              <div className="border-r border-b border-amber-700/30" />
+                              <div className="border-b border-amber-700/30" />
+                              <div className="border-r border-amber-700/30" />
+                              <div />
+                            </div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent pointer-events-none" />
+                          </div>
 
-                    <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-sm text-white ${
-                      tuitionInfo.isSolde 
-                        ? 'bg-emerald-600' 
-                        : 'bg-rose-600 animate-pulse'
-                    }`}>
-                      {tuitionInfo.isSolde ? (
-                        <>
-                          <CheckCircle2 size={10} />
-                          <span>SOLDÉ</span>
-                        </>
-                      ) : (
-                        <>
-                          <Clock size={10} />
-                          <span>RESTE SCOLARITÉ</span>
-                        </>
-                      )}
-                    </span>
-                  </div>
+                          {/* Contactless Waves */}
+                          <svg className="w-4 h-4 text-blue-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                            <path d="M8.5 16.5a5 5 0 0 1 0-7" />
+                            <path d="M12 19a8.5 8.5 0 0 0 0-14" />
+                            <path d="M15.5 21.5a12 12 0 0 0 0-19" />
+                          </svg>
 
-                  {/* Middle Section: Financial Amounts & Progress Box */}
-                  <div className="my-1 bg-white/95 backdrop-blur-sm rounded-2xl p-2.5 md:p-3 border border-blue-200 shadow-sm">
-                    <div className="flex justify-between items-end mb-1.5">
-                      <div>
-                        <p className="text-slate-500 text-[8px] md:text-[9px] font-black uppercase tracking-wider">
-                          TOTALE
-                        </p>
-                        <p className="text-slate-900 font-mono font-bold text-xs md:text-sm">
-                          {tuitionInfo.total.toLocaleString()} FCFA
-                        </p>
-                      </div>
+                          <div className="min-w-0">
+                            <h3 className="text-slate-900 font-black text-xs md:text-sm tracking-widest uppercase drop-shadow-xs truncate">
+                              CARTE SCOLARITÉ
+                            </h3>
+                            <p className="text-blue-900/80 font-bold text-[8px] md:text-[9px] tracking-wider uppercase truncate">
+                              {displaySchool} • 2025-2026
+                            </p>
+                          </div>
+                        </div>
 
-                      <div className="text-center">
-                        <p className="text-emerald-700 text-[8px] md:text-[9px] font-black uppercase tracking-wider">
-                          DÉJÀ PAYÉ
-                        </p>
-                        <p className="text-emerald-700 font-mono font-black text-xs md:text-sm">
-                          {tuitionInfo.paid.toLocaleString()} FCFA
-                        </p>
-                      </div>
-
-                      <div className="text-right">
-                        <p className={`${tuitionInfo.isSolde ? 'text-emerald-700' : 'text-rose-700'} text-[8px] md:text-[9px] font-black uppercase tracking-wider`}>
-                          RESTE
-                        </p>
-                        <p className={`${tuitionInfo.isSolde ? 'text-emerald-700' : 'text-rose-700'} font-mono font-black text-xs md:text-sm`}>
-                          {tuitionInfo.remainder.toLocaleString()} FCFA
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="w-full bg-slate-200 rounded-full h-2 p-0.5 border border-slate-300/60 overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-500 ${
+                        {/* Status Badge */}
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-md text-white shrink-0 border border-white/40 backdrop-blur-md ${
                           tuitionInfo.isSolde 
-                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500' 
-                            : 'bg-gradient-to-r from-blue-600 to-emerald-500'
-                        }`}
-                        style={{ width: `${tuitionInfo.percentage}%` }}
-                      />
-                    </div>
-
-                    <div className="flex justify-between items-center mt-1 text-[9px] font-bold">
-                      <span className="text-slate-600">Payé : {tuitionInfo.percentage}%</span>
-                      <span className={`uppercase ${tuitionInfo.isSolde ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        {tuitionInfo.isSolde ? '✓ Situation régularisée' : `Reste : ${tuitionInfo.remainder.toLocaleString()} FCFA`}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Student Info & Action Button */}
-                  <div className="border-t border-blue-300/80 pt-1.5 flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-blue-800 text-[8px] font-black tracking-widest uppercase">
-                          ÉLÈVE
-                        </p>
-                        <p className="text-blue-950 font-black text-xs truncate max-w-[170px]">
-                          {student.name}
-                        </p>
+                            ? 'bg-emerald-600/95' 
+                            : 'bg-rose-600/95 animate-pulse'
+                        }`}>
+                          {tuitionInfo.isSolde ? (
+                            <>
+                              <CheckCircle2 size={10} />
+                              <span>SOLDÉ</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock size={10} />
+                              <span>RESTE DÛ</span>
+                            </>
+                          )}
+                        </span>
                       </div>
 
-                      <div className="text-right">
-                        <p className="text-blue-800 text-[8px] font-black tracking-widest uppercase">
-                          MATRICULE & CLASSE
-                        </p>
-                        <p className="text-blue-950 font-mono font-bold text-xs">
-                          {student.studentId} • <span className="font-sans font-extrabold text-blue-900">{student.class}</span>
-                        </p>
+                      {/* Middle Section: Frosted Glass Financial Box */}
+                      <div className="my-1 bg-white/75 dark:bg-white/85 backdrop-blur-xl rounded-2xl p-2.5 md:p-3 border border-white/90 shadow-sm text-slate-800">
+                        <div className="flex justify-between items-end mb-1.5">
+                          <div>
+                            <p className="text-slate-500 text-[8px] md:text-[9px] font-bold uppercase tracking-widest truncate">
+                              MONTANT TOTAL
+                            </p>
+                            <p className="text-slate-900 font-mono font-black text-xs md:text-sm tracking-tight truncate">
+                              {tuitionInfo.total.toLocaleString()} FCFA
+                            </p>
+                          </div>
+
+                          <div className="text-center">
+                            <p className="text-emerald-700 text-[8px] md:text-[9px] font-bold uppercase tracking-widest truncate">
+                              DÉJÀ VERSÉ
+                            </p>
+                            <p className="text-emerald-600 font-mono font-black text-xs md:text-sm tracking-tight truncate">
+                              {tuitionInfo.paid.toLocaleString()} FCFA
+                            </p>
+                          </div>
+
+                          <div className="text-right">
+                            <p className={`${tuitionInfo.isSolde ? 'text-emerald-700' : 'text-rose-700'} text-[8px] md:text-[9px] font-bold uppercase tracking-widest truncate`}>
+                              SOLDE RESTANT
+                            </p>
+                            <p className={`${tuitionInfo.isSolde ? 'text-emerald-600' : 'text-rose-600'} font-mono font-black text-xs md:text-sm tracking-tight truncate`}>
+                              {tuitionInfo.remainder.toLocaleString()} FCFA
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="w-full bg-slate-200/90 rounded-full h-2 p-0.5 border border-slate-300/40 overflow-hidden shadow-inner">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              tuitionInfo.isSolde 
+                                ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]' 
+                                : 'bg-gradient-to-r from-blue-500 to-emerald-400 shadow-[0_0_8px_rgba(59,130,246,0.6)]'
+                            }`}
+                            style={{ width: `${tuitionInfo.percentage}%` }}
+                          />
+                        </div>
+
+                        <div className="flex justify-between items-center mt-1 text-[9px] font-bold">
+                          <span className="text-slate-600 truncate">Régularisation : {tuitionInfo.percentage}%</span>
+                          <span className={`uppercase truncate ${tuitionInfo.isSolde ? 'text-emerald-700 font-black' : 'text-rose-600 font-black'}`}>
+                            {tuitionInfo.isSolde ? '✓ Situation soldée' : `Reste : ${tuitionInfo.remainder.toLocaleString()} FCFA`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Cardholder Info & Embossed Card Digits */}
+                      <div className="border-t border-blue-900/15 pt-1.5 flex flex-col gap-1.5">
+                        <div className="flex justify-between items-end">
+                          <div className="min-w-0 flex-1 mr-2">
+                            <p className="text-slate-500 text-[7.5px] font-bold tracking-widest uppercase truncate">
+                              TITULAIRE DE LA CARTE
+                            </p>
+                            <p className="text-slate-900 font-black text-xs md:text-sm tracking-wider uppercase truncate" style={{ letterSpacing: '0.04em' }}>
+                              {displayName}
+                            </p>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <p className="text-slate-500 text-[7.5px] font-bold tracking-widest uppercase truncate">
+                              MATRICULE • CLASSE
+                            </p>
+                            <p className="text-slate-900 font-mono font-bold text-xs truncate">
+                              {displayMatricule} • <span className="font-sans font-extrabold text-blue-700">{displayClass}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Interactive Button to go to Croissance (Insights) */}
+                        <button
+                          onClick={goToCroissancePage}
+                          className="hidden md:flex w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-black text-xs rounded-xl shadow-md border border-blue-400 backdrop-blur-md items-center justify-center gap-2 transition-all cursor-pointer group"
+                          title="Ouvrir la gestion des paiements et relances dans Croissance"
+                        >
+                          <CreditCard size={14} className="shrink-0 text-white" />
+                          <span className="truncate">Ouvrir dans Croissance (Encaissement &amp; Relance)</span>
+                          <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform shrink-0" />
+                        </button>
                       </div>
                     </div>
-
-                    {/* Interactive Button to go to Croissance (Insights) - Desktop (PC) only */}
-                    <button
-                      onClick={goToCroissancePage}
-                      className="hidden md:flex w-full py-1.5 px-3 bg-blue-700 hover:bg-blue-800 active:scale-98 text-white font-black text-xs rounded-xl shadow-md items-center justify-center gap-2 transition-all cursor-pointer group"
-                      title="Ouvrir la gestion des paiements et relances dans Croissance"
-                    >
-                      <MessageSquare size={14} className="shrink-0" />
-                      <span>Ouvrir dans Croissance (Encaissement & Relance)</span>
-                      <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform shrink-0" />
-                    </button>
                   </div>
-                </div>
+                </TiltedCard>
               </motion.div>
             )}
           </AnimatePresence>
@@ -783,9 +656,9 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
               <div className="w-14 h-14 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-3">
                 <Trash2 size={28} />
               </div>
-              <h3 className="text-lg font-bold text-gray-800 mb-1">Supprimer l'élève ?</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-1">Supprimer la carte de l'élève ?</h3>
               <p className="text-gray-500 mb-6 text-xs font-medium">
-                Êtes-vous sûr de vouloir supprimer <span className="font-bold text-gray-700">{student.name}</span> ?
+                Êtes-vous sûr de vouloir supprimer la carte de <span className="font-bold text-gray-700">{student?.name || displayName}</span> ? Cette action est irréversible.
               </p>
               <div className="flex w-full gap-3">
                 <button
@@ -797,6 +670,15 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
                 <button
                   onClick={() => {
                     setShowConfirmDelete(false);
+                    if (student?.id) {
+                      try {
+                        const saved = localStorage.getItem('school_db_students');
+                        if (saved) {
+                          const list = JSON.parse(saved);
+                          localStorage.setItem('school_db_students', JSON.stringify(list.filter((s: any) => String(s.id) !== String(student.id) && String(s.studentId) !== String(student.id))));
+                        }
+                      } catch (e) {}
+                    }
                     onDelete?.();
                   }}
                   className="flex-1 py-3 rounded-2xl font-bold text-xs bg-red-500 text-white hover:bg-red-600 transition-colors shadow-lg shadow-red-200"
@@ -811,3 +693,5 @@ export const StudentCardSlider: React.FC<StudentCardSliderProps> = ({
     </div>
   );
 };
+
+export default StudentCardSlider;

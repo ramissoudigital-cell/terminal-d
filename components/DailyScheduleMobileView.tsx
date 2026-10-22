@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ChevronLeft, Bell, Check, MapPin, X, GraduationCap } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Bell, Check, MapPin, X, GraduationCap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getStoredTimeSlots, getLunchBreakIndex, getCourseSegments } from './SchedulePage';
 import { scheduleCourseNotifications, cancelAllCourseNotifications, triggerImmediateCourseReminder } from '../src/services/NotificationScheduler';
@@ -84,6 +84,52 @@ export const DailyScheduleMobileView: React.FC<DailyScheduleMobileViewProps> = (
   const [isExpanded, setIsExpanded] = useState(false);
   const [dayDirection, setDayDirection] = useState(0);
   const [selectedEventDetail, setSelectedEventDetail] = useState<ScheduleEvent | null>(null);
+
+  // Debounce guard to prevent double-skipping days (e.g. Capacitor duplicate touch & drag events)
+  const lastSwipeTimeRef = React.useRef<number>(0);
+
+  const goToNextDay = () => {
+    const now = Date.now();
+    if (now - lastSwipeTimeRef.current < 450) return;
+    lastSwipeTimeRef.current = now;
+    setDayDirection(1);
+    setSelectedDayIndex((prev) => (prev + 1) % DAYS.length);
+  };
+
+  const goToPrevDay = () => {
+    const now = Date.now();
+    if (now - lastSwipeTimeRef.current < 450) return;
+    lastSwipeTimeRef.current = now;
+    setDayDirection(-1);
+    setSelectedDayIndex((prev) => (prev - 1 + DAYS.length) % DAYS.length);
+  };
+
+  const touchStartXRef = React.useRef<number | null>(null);
+  const touchStartYRef = React.useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+
+    // Minimum swipe threshold 50px, predominantly horizontal movement
+    if (Math.abs(deltaX) > Math.abs(deltaY) * 1.25 && Math.abs(deltaX) > 50) {
+      if (deltaX < 0) {
+        // Glissement de la droite vers la gauche -> Exactement 1 jour suivant
+        goToNextDay();
+      } else {
+        // Glissement de la gauche vers la droite -> Exactement 1 jour précédent
+        goToPrevDay();
+      }
+    }
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
 
   React.useEffect(() => {
     window.dispatchEvent(new CustomEvent('modal-state-change', { detail: { isOpen: true } }));
@@ -319,7 +365,7 @@ export const DailyScheduleMobileView: React.FC<DailyScheduleMobileViewProps> = (
 
   const daySlideVariants = {
     enter: (direction: number) => ({
-      x: direction > 0 ? 100 : -100,
+      x: direction > 0 ? '100%' : '-100%',
       opacity: 0
     }),
     center: {
@@ -329,7 +375,7 @@ export const DailyScheduleMobileView: React.FC<DailyScheduleMobileViewProps> = (
     },
     exit: (direction: number) => ({
       zIndex: 0,
-      x: direction > 0 ? -100 : 100,
+      x: direction > 0 ? '-100%' : '100%',
       opacity: 0
     })
   };
@@ -371,17 +417,27 @@ export const DailyScheduleMobileView: React.FC<DailyScheduleMobileViewProps> = (
               />
             )}
             <div className="flex flex-col">
-              <span className="text-[20px] font-bold text-white leading-tight">
-                {classNameTitle ? classNameTitle.replace(/terminale/gi, 'Tle').replace(/TERMINALE/g, 'TLE') : "Emploi du temps"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[20px] font-bold text-white leading-tight">
+                  {classNameTitle ? classNameTitle.replace(/terminale/gi, 'Tle').replace(/TERMINALE/g, 'TLE') : "Emploi du temps"}
+                </span>
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/30 border border-emerald-300/40 text-[10px] font-bold text-white shadow-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
+                  <span>En direct</span>
+                </span>
+              </div>
               <span className="text-[12px] font-medium text-white/80">
-                {subtitle || "Planning de cours"}
+                {subtitle || "Planning synchronisé en temps réel"}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="relative overflow-hidden w-full px-4 sm:px-0">
+        <div 
+          className="relative overflow-hidden w-full px-4 sm:px-0"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
             {/* Week Strip */}
             <div className="mb-10 flex justify-between items-start text-center relative max-w-[22rem] mx-auto w-full px-4 h-[82px]">
                 {DAYS.map((dayName, index) => (
@@ -393,6 +449,8 @@ export const DailyScheduleMobileView: React.FC<DailyScheduleMobileViewProps> = (
                         : "flex flex-col items-center gap-3 cursor-pointer pt-[17px] w-[46px] transition-all duration-300"
                     } 
                     onClick={() => {
+                        const now = Date.now();
+                        lastSwipeTimeRef.current = now;
                         setDayDirection(index > selectedDayIndex ? 1 : -1);
                         setSelectedDayIndex(index);
                     }}
@@ -429,18 +487,46 @@ export const DailyScheduleMobileView: React.FC<DailyScheduleMobileViewProps> = (
               setIsExpanded(true);
             }
           }}
-          className="w-full flex justify-center pt-5 pb-5 bg-white relative z-20 cursor-grab active:cursor-grabbing"
+          className="w-full flex justify-center pt-5 pb-4 bg-white relative z-20 cursor-grab active:cursor-grabbing"
         >
           <div className="w-9 h-[4px] bg-[#E1E5F1] rounded-full pointer-events-none"></div>
         </motion.div>
         
-        <div className="px-6 mb-4 mt-2">
-            <h2 className="text-[22px] font-black text-slate-800">{FULL_DAYS[selectedDayIndex]}</h2>
+        {/* Day Header with indicator & Swipe Navigation controls */}
+        <div className="px-6 mb-3 mt-1 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <h2 className="text-[22px] font-black text-slate-800 tracking-tight truncate">{FULL_DAYS[selectedDayIndex]}</h2>
+            <span className="text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200/60 px-2 py-0.5 rounded-full shrink-0">
+              {selectedDayIndex + 1}/{DAYS.length}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={goToPrevDay}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+              title="Jour précédent (ou glisser vers la droite)"
+            >
+              <ChevronLeft size={16} strokeWidth={2.5} />
+            </button>
+            <button
+              type="button"
+              onClick={goToNextDay}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+              title="Jour suivant (ou glisser vers la gauche)"
+            >
+              <ChevronRight size={16} strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 sm:px-6 relative pb-[100px] custom-scrollbar">
+        {/* Timetable Scroll & Drag Area */}
+        <div 
+          className="flex-1 overflow-y-auto px-5 sm:px-6 relative pb-[100px] custom-scrollbar touch-pan-y"
+        >
           <div className="relative pt-2">
-            {/* Timetable grid setup */}
+            {/* Timetable grid setup with fluid slide animation */}
             <div className="relative overflow-visible w-full h-full">
               <AnimatePresence custom={dayDirection} mode="popLayout" initial={false}>
                 <motion.div
@@ -450,11 +536,23 @@ export const DailyScheduleMobileView: React.FC<DailyScheduleMobileViewProps> = (
                   initial="enter"
                   animate="center"
                   exit="exit"
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.2}
+                  onDragEnd={(_, info) => {
+                    const swipeThreshold = 50;
+                    if (info.offset.x < -swipeThreshold || info.velocity.x < -250) {
+                      goToNextDay();
+                    } else if (info.offset.x > swipeThreshold || info.velocity.x > 250) {
+                      goToPrevDay();
+                    }
+                  }}
                   transition={{
                     x: { type: "spring", stiffness: 300, damping: 30 },
-                    opacity: { duration: 0.2 }
+                    opacity: { duration: 0.22 }
                   }}
-                  className="w-full h-full"
+                  style={{ touchAction: 'pan-y' }}
+                  className="w-full h-full cursor-grab active:cursor-grabbing select-none"
                 >
                   {renderTimeline(selectedDayIndex)}
                 </motion.div>

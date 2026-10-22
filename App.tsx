@@ -65,9 +65,10 @@ const App: React.FC = () => {
   const [showAppSplash, setShowAppSplash] = useState(true);
 
   useEffect(() => {
+    // Prolong splash duration to allow the slow ParticleText animation to gather and be fully read
     const splashTimer = setTimeout(() => {
       setShowAppSplash(false);
-    }, 1300);
+    }, 4200);
     return () => clearTimeout(splashTimer);
   }, []);
 
@@ -298,6 +299,57 @@ const App: React.FC = () => {
         }
       });
 
+      // Subscribe to real-time schedules collection in Firestore so all user phones stay interconnected
+      const unsubscribeSchedules = subscribeToRealtimeCollection('schedules', (remoteSchedules: any[]) => {
+        if (remoteSchedules && remoteSchedules.length > 0) {
+          remoteSchedules.forEach((schedDoc) => {
+            if (schedDoc && Array.isArray(schedDoc.events) && schedDoc.events.length > 0) {
+              const classId = schedDoc.classId || schedDoc.id;
+              const className = schedDoc.className || '';
+              const events = schedDoc.events;
+              const CURRENT_VERSION = 'v4_tled1_devoir';
+
+              if (classId) {
+                localStorage.setItem(`school_schedule_${classId}`, JSON.stringify(events));
+                localStorage.setItem(`school_schedule_ver_${classId}`, CURRENT_VERSION);
+              }
+              if (className) {
+                localStorage.setItem(`school_schedule_${className}`, JSON.stringify(events));
+                localStorage.setItem(`school_schedule_ver_${className}`, CURRENT_VERSION);
+              }
+
+              window.dispatchEvent(new CustomEvent('school_schedule_updated', {
+                detail: { classId, className, events, source: 'remote' }
+              }));
+            }
+          });
+        }
+      });
+
+      // Subscribe to real-time time_slots collection in Firestore
+      const unsubscribeTimeSlots = subscribeToRealtimeCollection('time_slots', (remoteSlots: any[]) => {
+        if (remoteSlots && remoteSlots.length > 0) {
+          remoteSlots.forEach((slotDoc) => {
+            if (slotDoc && Array.isArray(slotDoc.slots) && slotDoc.slots.length > 0) {
+              const classId = slotDoc.classId || slotDoc.id;
+              const className = slotDoc.className || '';
+              const slots = slotDoc.slots;
+
+              if (classId) {
+                localStorage.setItem(`school_time_slots_${classId}`, JSON.stringify(slots));
+              }
+              if (className) {
+                localStorage.setItem(`school_time_slots_${className}`, JSON.stringify(slots));
+              }
+
+              window.dispatchEvent(new CustomEvent('school_time_slots_updated', {
+                detail: { classId, className, slots, source: 'remote' }
+              }));
+            }
+          });
+        }
+      });
+
       const handleTeacherRegistered = (e: any) => {
         const newT = e.detail;
         if (newT) {
@@ -335,6 +387,8 @@ const App: React.FC = () => {
         unsubscribeStudents();
         unsubscribeTeachers();
         unsubscribeUsers();
+        unsubscribeSchedules();
+        unsubscribeTimeSlots();
         window.removeEventListener('teacher-registered', handleTeacherRegistered);
         window.removeEventListener('student-registered', handleStudentRegistered);
       };
@@ -1001,6 +1055,27 @@ const App: React.FC = () => {
           isLightBg = true;
         }
       }
+
+      // Update Web & PWA theme-color meta tags dynamically for iOS Safari and Android Chrome
+      const themeColorMetas = document.querySelectorAll('meta[name="theme-color"]');
+      if (themeColorMetas.length > 0) {
+        themeColorMetas.forEach(meta => meta.setAttribute('content', bgColor));
+      } else {
+        const meta = document.createElement('meta');
+        meta.name = 'theme-color';
+        meta.content = bgColor;
+        document.head.appendChild(meta);
+      }
+
+      // Update apple-mobile-web-app-status-bar-style
+      const appleStatusMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute('content', isLightBg ? 'default' : 'black-translucent');
+      }
+
+      // Keep root & body backgrounds aligned to prevent notch letterboxing
+      document.documentElement.style.backgroundColor = bgColor;
+      document.body.style.backgroundColor = bgColor;
 
       // Update Electron Title Bar
       if (window.electronAPI) {

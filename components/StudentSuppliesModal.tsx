@@ -181,7 +181,7 @@ export const StudentSuppliesModal: React.FC<StudentSuppliesModalProps> = ({
   studentName,
   currentUser
 }) => {
-  const [activeClass, setActiveClass] = useState<string>(initialClassName || 'Seconde C1');
+  const [activeClass, setActiveClass] = useState<string>(initialClassName || 'Terminale D');
 
   useEffect(() => {
     if (initialClassName) {
@@ -468,26 +468,6 @@ export const StudentSuppliesModal: React.FC<StudentSuppliesModalProps> = ({
                     <FileText className="w-5 h-5 text-sky-600 shrink-0" />
                     <span>{selectedSubject ? selectedSubject : "Exercices & Devoirs"}</span>
                   </h2>
-                  {isTeacher ? (
-                    <select
-                      value={activeClass}
-                      onChange={(e) => {
-                        setActiveClass(e.target.value);
-                        setSelectedSubject(null);
-                        setShowAddForm(false);
-                      }}
-                      className="text-[11px] font-black bg-sky-50 text-sky-800 border border-sky-300 rounded-lg px-2 py-0.5 outline-none cursor-pointer hover:bg-sky-100"
-                      title="Changer de classe"
-                    >
-                      {['CP1', 'CP2', 'CE1', 'CE2', 'CM1', 'CM2', '6ème A', '6ème B', '5ème A', '5ème B', '4ème A', '4ème B', '3ème A', '3ème B', 'Seconde A', 'Seconde C', 'Seconde C1', '1ère A', '1ère D', 'Tle A', 'Tle D', 'Terminale D1'].map(cls => (
-                        <option key={cls} value={cls}>{cls}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="text-[11px] font-black bg-sky-50 text-sky-700 border border-sky-200/80 px-2 py-0.5 rounded-full shrink-0">
-                      {activeClass}
-                    </span>
-                  )}
                 </div>
                 <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 truncate">
                   {selectedSubject 

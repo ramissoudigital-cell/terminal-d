@@ -2,6 +2,8 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { School } from 'lucide-react';
 
+import ParticleText from './ParticleText';
+
 interface AppSplashScreenProps {
   onFinish?: () => void;
 }
@@ -24,10 +26,10 @@ export const AppSplashScreen: React.FC<AppSplashScreenProps> = () => {
         initial={{ scale: 0.9, opacity: 0, y: 10 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
-        className="relative z-10 flex flex-col items-center text-center px-6 max-w-xs"
+        className="relative z-10 flex flex-col items-center text-center px-6 max-w-sm w-full"
       >
         {/* Logo / Badge */}
-        <div className="relative mb-5">
+        <div className="relative mb-3">
           <div className="absolute -inset-2.5 rounded-3xl bg-white/60 blur-md animate-pulse" />
           <div className="w-24 h-24 rounded-3xl bg-white/90 backdrop-blur-md border border-white/80 p-3.5 shadow-2xl flex items-center justify-center relative z-10">
             <img 
@@ -44,25 +46,48 @@ export const AppSplashScreen: React.FC<AppSplashScreenProps> = () => {
           </div>
         </div>
 
-        {/* App Title */}
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1.5">
-          Terminale-D
-        </h1>
-        <p className="text-xs font-semibold text-blue-900 tracking-wide uppercase">
+        {/* Animated Particle Title Just Under Logo */}
+        <div className="w-full h-20 relative flex items-center justify-center select-none pointer-events-auto">
+          <ParticleText
+            text="Terminale-D"
+            particleSize={2.5}
+            density={2}
+            color="#ffffff"
+            highlightColor="#f0f9ff"
+            highlightMode="motion"
+            shape="circle"
+            intro="gather"
+            scatter={140}
+            gatherDuration={2400}
+            stagger={420}
+            clickBurst
+            burstStrength={1}
+            pointerRepel={32}
+            repelRadius={85}
+            idleDrift={0}
+            trigger="mount"
+            fontSize="clamp(2.2rem, 8vw, 2.9rem)"
+            fontWeight={900}
+            fontFamily="inherit"
+            glow
+          />
+        </div>
+
+        <p className="text-xs font-bold text-white/90 tracking-wider uppercase mt-1 drop-shadow-xs">
           Collège &amp; Lycée d'Excellence
         </p>
 
         {/* Loading bar */}
-        <div className="mt-8 w-16 h-1.5 bg-blue-900/15 rounded-full overflow-hidden relative">
+        <div className="mt-7 w-20 h-1.5 bg-white/30 rounded-full overflow-hidden relative backdrop-blur-xs">
           <motion.div 
-            className="absolute inset-y-0 bg-blue-600 rounded-full"
+            className="absolute inset-y-0 bg-white rounded-full shadow-xs"
             animate={{
               left: ['-50%', '100%'],
               width: ['40%', '60%']
             }}
             transition={{
               repeat: Infinity,
-              duration: 1.1,
+              duration: 1.3,
               ease: "easeInOut"
             }}
           />

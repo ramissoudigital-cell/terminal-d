@@ -75,7 +75,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activePage, 
               transition: { staggerChildren: 0.05, staggerDirection: -1, duration: 0.3 }
             }
           }}
-          className="fixed bottom-6 left-0 right-0 flex justify-center items-center space-x-[4px] z-[50] pointer-events-auto px-4"
+          className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] left-0 right-0 flex justify-center items-center space-x-[4px] z-[50] pointer-events-auto px-4"
         >
           {navItems.map((item, idx) => {
             const isActive = activePage === item.id;
@@ -105,7 +105,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activePage, 
                         animate={{ opacity: 1, width: 'auto', marginLeft: 8 }}
                         exit={{ opacity: 0, width: 0, marginLeft: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="text-white font-bold text-[13px] tracking-wide whitespace-nowrap overflow-hidden relative z-10"
+                        className="text-white font-bold text-[13px] tracking-wide whitespace-nowrap overflow-hidden text-ellipsis relative z-10 max-w-[120px]"
                       >
                         {item.label}
                       </motion.span>

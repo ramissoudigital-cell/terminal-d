@@ -128,9 +128,9 @@ export const SpendsChart: React.FC<SpendsChartProps> = ({ data, overallAverage, 
         <div className="flex-1 flex relative h-full">
           {/* Y Axis */}
           <div className="w-7 sm:w-9 relative flex-shrink-0 z-20 bg-transparent flex flex-col justify-between items-end pr-1.5 sm:pr-2.5 py-0.5">
-            {yAxisValues.map((val) => (
+            {yAxisValues.map((val, i) => (
               <div 
-                 key={val} 
+                 key={`y-val-${i}-${val}`} 
                  className="text-[10px] sm:text-xs font-extrabold text-slate-400 sm:text-slate-500 whitespace-nowrap"
               >
                 {val}
@@ -143,7 +143,7 @@ export const SpendsChart: React.FC<SpendsChartProps> = ({ data, overallAverage, 
             {/* Horizontal Grid lines */}
             <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
                 {yAxisValues.map((val, i) => (
-                    <div key={i} className="w-full h-[1px] bg-slate-100"></div>
+                    <div key={`grid-${i}-${val}`} className="w-full h-[1px] bg-slate-100"></div>
                 ))}
             </div>
 

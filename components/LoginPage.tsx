@@ -203,6 +203,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [validatedTeacherAccreditationCode, setValidatedTeacherAccreditationCode] = useState<string>(() => {
     return localStorage.getItem('last_entered_teacher_code') || '';
   });
+  const [isTeacherPrincipal, setIsTeacherPrincipal] = useState(false);
+  const [teacherPrincipalClass, setTeacherPrincipalClass] = useState('Terminale D');
   const [loginError, setLoginError] = useState("");
   const [authError, setAuthError] = useState("");
   const [authErrorCode, setAuthErrorCode] = useState<string | null>(null);
@@ -460,7 +462,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             photo: profilePhoto || undefined,
             childrenCount: role === 'parent' ? parentChildrenList.length : undefined,
             children: role === 'parent' ? parentChildrenList : undefined,
-            directorType: (activeLevel === 'Niveau 5' && directorType) ? directorType : undefined
+            directorType: (activeLevel === 'Niveau 5' && directorType) ? directorType : undefined,
+            isPrincipal: isTeacher && isTeacherPrincipal,
+            isProfesseurPrincipal: isTeacher && isTeacherPrincipal,
+            principalClasses: (isTeacher && isTeacherPrincipal) ? [teacherPrincipalClass || 'Terminale D'] : []
           });
 
           if (isTeacher && teacherAccreditationToUse && registeredUser) {
@@ -476,7 +481,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             section: userSection,
             ...(isTeacher ? {
               accreditationCode: teacherAccreditationToUse || registeredUser.accreditationCode,
-              subject: teacherSubjectToUse
+              subject: teacherSubjectToUse,
+              isPrincipal: isTeacherPrincipal,
+              isProfesseurPrincipal: isTeacherPrincipal,
+              principalClasses: isTeacherPrincipal ? [teacherPrincipalClass || 'Terminale D'] : []
             } : {})
           });
         }
@@ -825,6 +833,65 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                             Ce code est <b>strictement individuel</b>. Après votre inscription, seul vous pourrez le consulter dans <b>Paramètres &gt; Accréditation</b>. Les professeurs des autres matières ne peuvent pas le voir.
                           </span>
                         </div>
+                      </div>
+
+                      {/* Professeur Principal Toggle */}
+                      <div className="p-4 bg-sky-50/70 border border-sky-200/80 rounded-[20px] space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${isTeacherPrincipal ? 'bg-sky-600 text-white shadow-sm' : 'bg-sky-100 text-sky-600'}`}>
+                              <GraduationCap className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <label htmlFor="pp-toggle" className="text-[13px] font-bold text-slate-800 cursor-pointer block">
+                                Êtes-vous Professeur Principal ?
+                              </label>
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                {isTeacherPrincipal ? 'Actif - Responsable de la classe' : 'Activez si vous êtes le prof principal'}
+                              </span>
+                            </div>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              id="pp-toggle"
+                              type="checkbox" 
+                              checked={isTeacherPrincipal} 
+                              onChange={(e) => setIsTeacherPrincipal(e.target.checked)} 
+                              className="sr-only peer" 
+                            />
+                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                          </label>
+                        </div>
+
+                        {isTeacherPrincipal && (
+                          <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pt-2.5 border-t border-sky-200/60 space-y-1.5"
+                          >
+                            <label className="block text-[11px] font-bold text-sky-900 uppercase tracking-wider">
+                              Classe dont vous êtes le Professeur Principal
+                            </label>
+                            <select
+                              value={teacherPrincipalClass}
+                              onChange={(e) => setTeacherPrincipalClass(e.target.value)}
+                              className="w-full bg-white border border-sky-300 rounded-[14px] py-2.5 px-3 text-[13px] font-bold text-sky-950 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                            >
+                              <option value="Terminale D">Terminale D</option>
+                              <option value="Terminale D1">Terminale D1</option>
+                              <option value="Terminale D2">Terminale D2</option>
+                              <option value="Terminale C">Terminale C</option>
+                              <option value="Terminale A">Terminale A</option>
+                              <option value="1ère D">1ère D</option>
+                              <option value="2nde C">2nde C</option>
+                            </select>
+                            <p className="text-[11px] text-sky-700 font-medium flex items-center gap-1.5 mt-1">
+                              <Sparkles className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                              <span>L'application vous reconnaîtra automatiquement comme Professeur Principal de la classe.</span>
+                            </p>
+                          </motion.div>
+                        )}
                       </div>
                     </div>
 
