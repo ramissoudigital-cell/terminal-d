@@ -12,7 +12,7 @@ import { PrintableBulletin } from './PrintableBulletin';
 import { Student } from '../types';
 import { checkIsPrincipalForClass, getClassPrincipalTeacherSignature } from '../src/utils/teacherUtils';
 import { isTechnicalClass, formatPeriodLabel, getPeriodOptions, calculateAnnualAverage } from '../src/utils/academicUtils';
-import { getSubjectCoef } from './TransactionList';
+import { getSubjectCoef, isSubjectMatch } from './TransactionList';
 import { COUNTRIES_DATA } from '../data/countries';
 import { mockClasses } from '../data/mockData';
 import { getGradeAppreciations } from '../src/utils/gradeAppreciations';
@@ -767,7 +767,7 @@ export default function WalletDashboard({
   };
 
   const getCoef = (className: string | undefined, subjectName: string) => {
-    if (subjectName.toLowerCase().includes('informatique')) {
+    if ((subjectName || '').toLowerCase().includes('informatique')) {
       return 0;
     }
     if (className && className?.match(/(Tle D|T°D|TD|Terminale D|TerminaleD)/i)) {
@@ -869,24 +869,24 @@ export default function WalletDashboard({
   });
 
   if (isTechnicalClass(student?.class)) {
-    const allemand = filteredSubjects.find(s => s.name.toLowerCase().includes("allemand"));
-    const espagnol = filteredSubjects.find(s => s.name.toLowerCase().includes("espagnol"));
+    const allemand = filteredSubjects.find(s => (s?.name || '').toLowerCase().includes("allemand"));
+    const espagnol = filteredSubjects.find(s => (s?.name || '').toLowerCase().includes("espagnol"));
     
     if (allemand && espagnol) {
       const hasAllemandGrades = (allemand.grades && allemand.grades.length > 0) || (typeof allemand.average === 'number' && allemand.average > 0);
       const hasEspagnolGrades = (espagnol.grades && espagnol.grades.length > 0) || (typeof espagnol.average === 'number' && espagnol.average > 0);
 
       if (hasAllemandGrades && !hasEspagnolGrades) {
-        filteredSubjects = filteredSubjects.map(s => s.name.toLowerCase().includes("espagnol") ? { ...s, inactive: true } : s);
+        filteredSubjects = filteredSubjects.map(s => (s?.name || '').toLowerCase().includes("espagnol") ? { ...s, inactive: true } : s);
       } else if (hasEspagnolGrades && !hasAllemandGrades) {
-        filteredSubjects = filteredSubjects.map(s => s.name.toLowerCase().includes("allemand") ? { ...s, inactive: true } : s);
+        filteredSubjects = filteredSubjects.map(s => (s?.name || '').toLowerCase().includes("allemand") ? { ...s, inactive: true } : s);
       } else if (hasAllemandGrades && hasEspagnolGrades) {
         const countAll = allemand.grades?.length || 0;
         const countEsp = espagnol.grades?.length || 0;
         if (countEsp >= countAll) {
-          filteredSubjects = filteredSubjects.map(s => s.name.toLowerCase().includes("allemand") ? { ...s, inactive: true } : s);
+          filteredSubjects = filteredSubjects.map(s => (s?.name || '').toLowerCase().includes("allemand") ? { ...s, inactive: true } : s);
         } else {
-          filteredSubjects = filteredSubjects.map(s => s.name.toLowerCase().includes("espagnol") ? { ...s, inactive: true } : s);
+          filteredSubjects = filteredSubjects.map(s => (s?.name || '').toLowerCase().includes("espagnol") ? { ...s, inactive: true } : s);
         }
       }
     }
@@ -944,7 +944,7 @@ export default function WalletDashboard({
 
   const totalPoints = subjects.reduce((acc, sub) => {
     if (sub.inactive) return acc;
-    if (sub.coef === 0 || sub.name.toLowerCase().includes('informatique')) {
+    if (sub.coef === 0 || (sub.name || '').toLowerCase().includes('informatique')) {
       const g = parseFloat(sub.grade || '0');
       const bonus = g > 10 ? g - 10 : 0;
       return acc + bonus;
@@ -954,7 +954,7 @@ export default function WalletDashboard({
 
   const totalCoef = subjects.reduce((acc, sub) => {
     if (sub.inactive) return acc;
-    if (sub.coef === 0 || sub.name.toLowerCase().includes('informatique')) {
+    if (sub.coef === 0 || (sub.name || '').toLowerCase().includes('informatique')) {
       return acc;
     }
     return acc + sub.coef;
@@ -1250,16 +1250,6 @@ export default function WalletDashboard({
          <div className="hidden md:block space-y-4">
             {subjects.map((subject, idx) => {
                 const isTeacher = currentUser?.role === "teacher";
-                const isSubjectMatch = (tSub?: string, sSub?: string) => {
-                  if (!tSub || !sSub) return true;
-                  const t = tSub.toLowerCase().trim();
-                  const s = sSub.toLowerCase().trim();
-                  if (t === s || t.includes(s) || s.includes(t)) return true;
-                  if (t.includes('math') && s.includes('math')) return true;
-                  if (t.includes('physique') && s.includes('physique')) return true;
-                  const parts = t.split(',').map(p => p.trim());
-                  return parts.some(p => p && (p === s || p.includes(s) || s.includes(p)));
-                };
                 const isSubjectDisabled = isTeacher && currentUser?.subject && !isSubjectMatch(currentUser.subject, subject.name);
               
                 return (
@@ -2672,16 +2662,6 @@ export default function WalletDashboard({
               <div className="overflow-y-auto custom-scrollbar flex-1 pb-10 flex flex-col gap-4 px-2">
                 {subjects.map((subject, index) => {
                   const isTeacher = currentUser?.role === 'teacher';
-                  const isSubjectMatch = (tSub?: string, sSub?: string) => {
-                    if (!tSub || !sSub) return true;
-                    const t = tSub.toLowerCase().trim();
-                    const s = sSub.toLowerCase().trim();
-                    if (t === s || t.includes(s) || s.includes(t)) return true;
-                    if (t.includes('math') && s.includes('math')) return true;
-                    if (t.includes('physique') && s.includes('physique')) return true;
-                    const parts = t.split(',').map(p => p.trim());
-                    return parts.some(p => p && (p === s || p.includes(s) || s.includes(p)));
-                  };
                   const isInactive = Boolean(subject.inactive);
                   const isRestricted = isInactive || (isTeacher && currentUser?.subject && !isSubjectMatch(currentUser.subject, subject.name));
                   

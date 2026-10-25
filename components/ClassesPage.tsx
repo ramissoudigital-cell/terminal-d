@@ -11,13 +11,14 @@ import { saveExerciseToClass, deleteExerciseFromClass, getExercisesForClass } fr
 import { PrintableLivret } from './PrintableLivret';
 import { compressImage } from '../src/utils/userUtils';
 import { cleanUtf8 } from '../src/utils/encodingUtils';
+import { isSubjectMatch } from './TransactionList';
 
 // Constants for Schedule Editing
 const SUBJECTS = [
     'Mathématiques', 'Français', 'Anglais', 'Hist-Géo', 'SVT', 
     'Physique-Chimie', 'EPS', 'Philosophie', 'Informatique', 'Espagnol', 
     'Allemand', 'Arts Plastiques', 'Musique', 'Devoir',
-    'Histoire', 'Géographie', 'EDHC', 'Sciences et Technologies', 'Éducation Musicale', 'Sciences et Technologies (notions de base)'
+    'Histoire', 'Géographie', 'EDHC', 'Conduite', 'Sciences et Technologies', 'Éducation Musicale', 'Sciences et Technologies (notions de base)'
 ];
 
 const ROOMS = [
@@ -472,10 +473,20 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({ onAnalyzeStudent, allS
       const file = e.target.files?.[0];
       if (!file) return;
       try {
-          const compressed = await compressImage(file, 900, 900, 0.75);
-          handleUpdateSupplyRow(index, 'image', compressed);
+          let result = '';
+          if (file.type.startsWith('image/')) {
+              result = await compressImage(file, 900, 900, 0.75);
+          } else {
+              result = await new Promise((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.onerror = reject;
+                  reader.readAsDataURL(file);
+              });
+          }
+          handleUpdateSupplyRow(index, 'image', result);
       } catch (err: any) {
-          alert(err?.message || "Erreur lors de la compression de la photo.");
+          alert(err?.message || "Erreur lors du chargement du fichier.");
       }
   };
 
@@ -600,11 +611,14 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({ onAnalyzeStudent, allS
       realStudents = combined;
     }
 
+    // Sort students alphabetically by name so SOUMAÏLA FOFANA (and all students) appear in correct alphabetical order
+    realStudents.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr', { sensitivity: 'base' }));
+
     if (!searchTerm.trim()) return realStudents;
 
     const term = searchTerm.toLowerCase();
     return realStudents.filter(s => 
-      s.name.toLowerCase().includes(term) || 
+      (s.name || '').toLowerCase().includes(term) || 
       (s.studentId && s.studentId.toLowerCase().includes(term))
     );
   }, [selectedClass, allStudents, searchTerm, currentUser]);
@@ -1233,7 +1247,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({ onAnalyzeStudent, allS
                                     {(() => {
                                         const c = formData.room || selectedClass?.name || '';
                                         const available = getSubjectsForClass(c);
-                                        return available.map(s => <option key={s} value={s} disabled={currentUser?.role === "teacher" && currentUser?.subject && s !== currentUser.subject}>{s}</option>);
+                                        return available.map(s => <option key={s} value={s} disabled={currentUser?.role === "teacher" && currentUser?.subject && !isSubjectMatch(currentUser.subject, s)}>{s}</option>);
                                     })()}
                                 </select>
                             </div>
@@ -1539,7 +1553,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({ onAnalyzeStudent, allS
                                                             <span>Prendre en photo / Joindre l'image</span>
                                                             <input
                                                                 type="file"
-                                                                accept="image/*"
+                                                                accept="image/*,.pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                                                                 capture="environment"
                                                                 onChange={e => handleImageUpload(index, e)}
                                                                 className="hidden"

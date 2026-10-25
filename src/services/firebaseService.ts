@@ -42,6 +42,7 @@ export function sanitizeForFirestore<T extends Record<string, any>>(data: T): T 
 export interface PreRegisteredUser {
   id: string;
   matricule?: string;
+  studentId?: string;
   email?: string;
   lastName: string;
   firstName: string;
@@ -59,6 +60,12 @@ export interface PreRegisteredUser {
   isAccountCreated?: boolean;
   authUid?: string;
   createdAt?: any;
+  studentDocId?: string;
+  birthDate?: string;
+  birthPlace?: string;
+  gender?: 'M' | 'F';
+  assignedStatus?: string;
+  existingStudentData?: any;
 }
 
 // 1. Initial Default Pre-Registered Accounts to seed in Firestore if empty
@@ -250,7 +257,7 @@ function isNameMatch(
 
 function isCandidateProfileMatch(
   queryKey: { matricule?: string; email?: string; phone?: string; name?: string; firstName?: string; lastName?: string; role?: UserRole },
-  candidate: { matricule?: string; email?: string; phone?: string; parentPhone?: string; studentPhone?: string; name?: string; firstName?: string; lastName?: string; role?: UserRole }
+  candidate: { matricule?: string; studentId?: string; email?: string; phone?: string; parentPhone?: string; studentPhone?: string; name?: string; firstName?: string; lastName?: string; role?: UserRole }
 ): boolean {
   // 1. Check role compatibility
   if (queryKey.role && candidate.role) {
@@ -259,10 +266,12 @@ function isCandidateProfileMatch(
     if (queryKey.role === 'parent' && candidate.role !== 'parent' && candidate.role !== 'student') return false;
   }
 
-  // 2. If user provided a matricule, candidate MUST match matricule if candidate has one!
-  if (queryKey.matricule && queryKey.matricule.trim().length >= 2) {
-    if (candidate.matricule && candidate.matricule.trim().length >= 2) {
-      return isMatriculeMatch(queryKey.matricule, candidate.matricule);
+  const candMat = candidate.matricule || candidate.studentId;
+
+  // 2. If user provided a matricule and candidate has matricule/studentId -> direct match!
+  if (queryKey.matricule && candMat) {
+    if (isMatriculeMatch(queryKey.matricule, candMat)) {
+      return true;
     }
   }
 
@@ -276,16 +285,9 @@ function isCandidateProfileMatch(
     return true;
   }
 
-  // 5. Matricule match
-  if (queryKey.matricule && candidate.matricule && isMatriculeMatch(queryKey.matricule, candidate.matricule)) {
+  // 5. Name match (if provided)
+  if (isNameMatch(queryKey.firstName, queryKey.lastName, queryKey.name, candidate.firstName, candidate.lastName, candidate.name)) {
     return true;
-  }
-
-  // 6. Name match (only if matricule was NOT provided, or candidate has no matricule)
-  if (!queryKey.matricule || !candidate.matricule) {
-    if (isNameMatch(queryKey.firstName, queryKey.lastName, queryKey.name, candidate.firstName, candidate.lastName, candidate.name)) {
-      return true;
-    }
   }
 
   return false;
@@ -334,6 +336,7 @@ export const findPreRegisteredProfile = async (
           lastName: tLast,
           email: data.email,
           matricule: data.matricule,
+          studentId: data.matricule,
           phone: data.phone,
           role: 'teacher' as UserRole,
           accessLevel: 3,
@@ -359,19 +362,31 @@ export const findPreRegisteredProfile = async (
         const sName = data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim();
         const sFirst = data.firstName || sName.split(' ')[0] || '';
         const sLast = data.lastName || sName.split(' ').slice(1).join(' ') || '';
+        const sMat = data.matricule || data.studentId;
 
-        const candidate = {
+        const candidate: PreRegisteredUser = {
           id: d.id,
+          studentDocId: d.id,
           name: sName,
           firstName: sFirst,
           lastName: sLast,
           email: data.email,
-          matricule: data.matricule,
-          parentPhone: data.parentPhone,
-          studentPhone: data.studentPhone,
+          matricule: sMat,
+          studentId: sMat,
+          parentPhone: data.parentPhone || data.fatherPhone || data.motherPhone || data.tutorPhone || data.parentContact,
+          studentPhone: data.studentPhone || data.phone,
+          phone: data.studentPhone || data.phone || data.parentPhone,
+          assignedClass: data.class || data.assignedClass || 'Terminale D1',
+          assignedClasses: [data.class || data.assignedClass || 'Terminale D1'],
+          birthDate: data.birthDate,
+          birthPlace: data.birthPlace,
+          gender: data.gender,
+          photo: data.photoUrl || data.photo,
+          assignedStatus: data.assignedStatus,
           role: 'student' as UserRole,
           accessLevel: 1,
-          isAccountCreated: !!data.authUid
+          isAccountCreated: !!(data.authUid || data.accountCreated || data.isAccountCreated),
+          existingStudentData: data
         };
 
         if (isCandidateProfileMatch(queryKey, candidate)) {
@@ -397,6 +412,7 @@ export const findPreRegisteredProfile = async (
           lastName: tLast,
           email: t.email,
           matricule: t.matricule,
+          studentId: t.matricule,
           phone: t.phone,
           role: 'teacher' as UserRole,
           accessLevel: 3,
@@ -415,19 +431,31 @@ export const findPreRegisteredProfile = async (
         const sName = s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
         const sFirst = s.firstName || sName.split(' ')[0] || '';
         const sLast = s.lastName || sName.split(' ').slice(1).join(' ') || '';
+        const sMat = s.matricule || s.studentId;
 
-        const candidate = {
+        const candidate: PreRegisteredUser = {
           id: String(s.id || `local-s-${Date.now()}`),
+          studentDocId: String(s.id),
           name: sName,
           firstName: sFirst,
           lastName: sLast,
           email: s.email,
-          matricule: s.matricule,
-          parentPhone: s.parentPhone,
-          studentPhone: s.studentPhone,
+          matricule: sMat,
+          studentId: sMat,
+          parentPhone: s.parentPhone || s.fatherPhone || s.motherPhone || s.tutorPhone || s.parentContact,
+          studentPhone: s.studentPhone || s.phone,
+          phone: s.studentPhone || s.phone || s.parentPhone,
+          assignedClass: s.class || s.assignedClass || 'Terminale D1',
+          assignedClasses: [s.class || s.assignedClass || 'Terminale D1'],
+          birthDate: s.birthDate,
+          birthPlace: s.birthPlace,
+          gender: s.gender,
+          photo: s.photoUrl || s.photo,
+          assignedStatus: s.assignedStatus,
           role: 'student' as UserRole,
           accessLevel: 1,
-          isAccountCreated: !!s.authUid
+          isAccountCreated: !!(s.authUid || s.accountCreated || s.isAccountCreated),
+          existingStudentData: s
         };
 
         if (isCandidateProfileMatch(queryKey, candidate)) {
@@ -443,6 +471,15 @@ export const findPreRegisteredProfile = async (
     console.error('Error finding pre-registered profile:', error);
     return null;
   }
+};
+
+// Helper for live lookup in registration UI
+export const lookupPreRegisteredStudent = async (matriculeOrSearch: string): Promise<PreRegisteredUser | null> => {
+  if (!matriculeOrSearch || matriculeOrSearch.trim().length < 2) return null;
+  return await findPreRegisteredProfile({
+    matricule: matriculeOrSearch.trim(),
+    role: 'student'
+  });
 };
 
 // 4. Admin function to pre-register a user in Dashboard
@@ -683,27 +720,40 @@ export const registerUserAccount = async (params: {
 
   // Step 4: Create final user profile in `users` collection in Firestore
 
-  const childrenToUse = preProfile?.children || params.children || (params.matricule ? [{ matricule: params.matricule, assignedClass: params.assignedClass || '6ème 1' }] : []);
+  const preStudentMatricule = preProfile?.matricule || preProfile?.studentId || (preProfile?.existingStudentData && (preProfile.existingStudentData.matricule || preProfile.existingStudentData.studentId));
+  const finalMatricule = role === 'parent' 
+    ? (params.children?.[0]?.matricule || params.matricule || preProfile?.matricule || '') 
+    : (params.matricule || preStudentMatricule || (role === 'teacher' ? `ENS-${Math.floor(1000 + Math.random() * 9000)}` : ''));
+
+  const finalClass = role === 'parent'
+    ? (params.children?.[0]?.assignedClass || params.assignedClass || preProfile?.assignedClass || 'Terminale D1')
+    : (preProfile?.assignedClass || preProfile?.existingStudentData?.class || params.assignedClass || 'Terminale D1');
+
+  const childrenToUse = preProfile?.children || params.children || (finalMatricule && role === 'parent' ? [{ matricule: finalMatricule, assignedClass: finalClass }] : []);
   const childrenCountToUse = childrenToUse.length || params.childrenCount || 1;
 
   const rawProfile: any = {
     id: authUid,
-    name: name,
+    name: preProfile?.name || name,
     role: role,
     accessLevel: accessLevel,
     pinCode: params.password || '0000',
     password: params.password || '0000',
-    photo: params.photo || preProfile?.photo || '',
+    photo: params.photo || preProfile?.photo || preProfile?.existingStudentData?.photoUrl || preProfile?.existingStudentData?.photo || '',
     email: params.email || preProfile?.email || '',
-    matricule: childrenToUse[0]?.matricule || params.matricule || preProfile?.matricule || '',
-    parentPhone: params.phone || preProfile?.parentPhone || preProfile?.phone || '',
-    studentPhone: params.phone || preProfile?.studentPhone || preProfile?.phone || '',
-    phone: params.phone || preProfile?.phone || preProfile?.parentPhone || preProfile?.studentPhone || '',
-    assignedClass: childrenToUse[0]?.assignedClass || params.assignedClass || preProfile?.assignedClass || '6ème 1',
-    assignedClasses: childrenToUse.length > 0 ? Array.from(new Set(childrenToUse.map(c => c.assignedClass))) : (params.assignedClasses || preProfile?.assignedClasses || (params.assignedClass ? [params.assignedClass] : [])),
+    matricule: finalMatricule,
+    parentPhone: params.phone || preProfile?.parentPhone || preProfile?.phone || preProfile?.existingStudentData?.parentPhone || '',
+    studentPhone: params.phone || preProfile?.studentPhone || preProfile?.phone || preProfile?.existingStudentData?.studentPhone || '',
+    phone: params.phone || preProfile?.phone || preProfile?.parentPhone || preProfile?.studentPhone || preProfile?.existingStudentData?.phone || '',
+    assignedClass: finalClass,
+    assignedClasses: childrenToUse.length > 0 ? Array.from(new Set(childrenToUse.map(c => c.assignedClass))) : (params.assignedClasses || preProfile?.assignedClasses || (finalClass ? [finalClass] : [])),
     subject: (role === 'teacher' || role === 'director') ? (params.subject || preProfile?.subject || '') : undefined,
     accreditationCode: (role === 'teacher' || role === 'director') ? (params.accreditationCode || preProfile?.accreditationCode || '') : undefined,
     section: params.section || preProfile?.section || 'Secondaire',
+    birthDate: preProfile?.birthDate || preProfile?.existingStudentData?.birthDate || '',
+    birthPlace: preProfile?.birthPlace || preProfile?.existingStudentData?.birthPlace || '',
+    gender: preProfile?.gender || preProfile?.existingStudentData?.gender || undefined,
+    assignedStatus: preProfile?.assignedStatus || preProfile?.existingStudentData?.assignedStatus || 'affecte',
     childrenCount: childrenCountToUse,
     children: childrenToUse,
     isPrincipal: Boolean(params.isPrincipal || params.isProfesseurPrincipal || preProfile?.isPrincipal),
@@ -785,30 +835,97 @@ export const registerUserAccount = async (params: {
     }
   }
 
-  // Step 5b: Sync student profile to `students` collection & localStorage
+  // Step 5b: Sync & Link student profile to `students` collection & localStorage
   if (role === 'student') {
-    const studentId = preProfile?.id && !preProfile.id.startsWith('auto-')
-      ? String(preProfile.id)
-      : (params.matricule || `STU-${authUid || Date.now()}`);
+    const studentMatricule = finalMatricule || `2024-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const studentMatricule = params.matricule || preProfile?.matricule || `2024-${Math.floor(1000 + Math.random() * 9000)}`;
-    const studentClass = params.assignedClass || preProfile?.assignedClass || 'Terminale D1';
+    // Look for existing student record to LINK instead of duplicating
+    let existingStudentDoc: any = preProfile?.existingStudentData || null;
+    let targetDocId = preProfile?.studentDocId || (preProfile?.role === 'student' && preProfile.id ? preProfile.id : null);
 
-    const studentDoc = {
-      id: studentId,
+    if (!existingStudentDoc) {
+      try {
+        const studentsCol = collection(db, 'students');
+        const sSnap = await getDocs(studentsCol);
+        for (const d of sSnap.docs) {
+          const sData = d.data();
+          const sMat = sData.matricule || sData.studentId;
+          const isMatch =
+            (studentMatricule && sMat && isMatriculeMatch(studentMatricule, sMat)) ||
+            (params.email && sData.email && isEmailMatch(params.email, sData.email)) ||
+            (params.phone && isPhoneMatch(params.phone, sData.studentPhone, sData.phone, sData.parentPhone)) ||
+            (isNameMatch(params.firstName, params.lastName, name, sData.firstName, sData.lastName, sData.name));
+          if (isMatch) {
+            existingStudentDoc = sData;
+            targetDocId = d.id;
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn("Error finding student in students collection:", e);
+      }
+    }
+
+    if (!existingStudentDoc) {
+      try {
+        const localStudents: any[] = JSON.parse(localStorage.getItem('school_db_students') || '[]');
+        const matched = localStudents.find(s => {
+          const sMat = s.matricule || s.studentId;
+          return (
+            (studentMatricule && sMat && isMatriculeMatch(studentMatricule, sMat)) ||
+            (params.email && s.email && isEmailMatch(params.email, s.email)) ||
+            (params.phone && isPhoneMatch(params.phone, s.studentPhone, s.phone, s.parentPhone)) ||
+            (isNameMatch(params.firstName, params.lastName, name, s.firstName, s.lastName, s.name))
+          );
+        });
+        if (matched) {
+          existingStudentDoc = matched;
+          targetDocId = String(matched.id);
+        }
+      } catch (e) {}
+    }
+
+    const finalDocId = targetDocId ? String(targetDocId) : (params.matricule || `STU-${authUid || Date.now()}`);
+    const studentClass = existingStudentDoc?.class || finalClass || 'Terminale D1';
+
+    // If pre-registered student was found, PRESERVE their existing subjects, grades, performance, and documents!
+    const studentDoc = existingStudentDoc ? {
+      ...existingStudentDoc,
+      id: finalDocId,
+      name: existingStudentDoc.name || name,
+      firstName: existingStudentDoc.firstName || params.firstName || name.split(' ')[0] || '',
+      lastName: existingStudentDoc.lastName || params.lastName || name.split(' ').slice(1).join(' ') || '',
+      studentId: existingStudentDoc.studentId || studentMatricule,
+      matricule: existingStudentDoc.matricule || studentMatricule,
+      class: studentClass,
+      photoUrl: params.photo || existingStudentDoc.photoUrl || existingStudentDoc.photo || preProfile?.photo || `https://i.pravatar.cc/150?u=${Date.now()}`,
+      photo: params.photo || existingStudentDoc.photo || existingStudentDoc.photoUrl || preProfile?.photo || `https://i.pravatar.cc/150?u=${Date.now()}`,
+      phone: params.phone || existingStudentDoc.studentPhone || existingStudentDoc.phone || '',
+      studentPhone: params.phone || existingStudentDoc.studentPhone || existingStudentDoc.phone || '',
+      parentPhone: (params as any).parentPhone || existingStudentDoc.parentPhone || preProfile?.parentPhone || '',
+      assignedStatus: existingStudentDoc.assignedStatus || preProfile?.assignedStatus || 'affecte',
+      email: params.email || existingStudentDoc.email || '',
+      authUid: authUid,
+      accountCreated: true,
+      isAccountCreated: true
+    } : {
+      id: finalDocId,
       name: name,
       firstName: params.firstName || name.split(' ')[0] || '',
       lastName: params.lastName || name.split(' ').slice(1).join(' ') || '',
       studentId: studentMatricule,
       matricule: studentMatricule,
       class: studentClass,
+      photoUrl: params.photo || preProfile?.photo || `https://i.pravatar.cc/150?u=${Date.now()}`,
       photo: params.photo || preProfile?.photo || `https://i.pravatar.cc/150?u=${Date.now()}`,
       phone: params.phone || '',
+      studentPhone: params.phone || '',
       parentPhone: (params as any).parentPhone || '',
       assignedStatus: 'affecte',
       email: params.email || '',
       authUid: authUid,
       accountCreated: true,
+      isAccountCreated: true,
       subjects: [
         { name: 'Mathématiques', value: 20, average: 0, fill: '#3b82f6' },
         { name: 'Physique-Chimie', value: 20, average: 0, fill: '#fbbf24' },
@@ -821,15 +938,16 @@ export const registerUserAccount = async (params: {
       ]
     };
 
-    // Save to Firestore students collection
-    await setDoc(doc(db, 'students', studentId), sanitizeForFirestore(studentDoc), { merge: true }).catch(() => {});
+    // Save or update in Firestore students collection (merging so no grades/bulletins are lost)
+    await setDoc(doc(db, 'students', finalDocId), sanitizeForFirestore(studentDoc), { merge: true }).catch(() => {});
 
-    // Save to localStorage school_db_students immediately
+    // Save or update in localStorage school_db_students immediately
     try {
       const localStudents = JSON.parse(localStorage.getItem('school_db_students') || '[]');
       const existIdx = localStudents.findIndex((s: any) => 
-        String(s.id) === String(studentId) || 
-        s.studentId === studentDoc.studentId || 
+        String(s.id) === String(finalDocId) || 
+        (targetDocId && String(s.id) === String(targetDocId)) ||
+        (s.studentId && s.studentId === studentDoc.studentId) || 
         (s.matricule && s.matricule === studentDoc.matricule)
       );
       if (existIdx >= 0) {
@@ -980,45 +1098,48 @@ export const checkUserAccountExists = async (identifier: string): Promise<{
   } catch (e) {}
 
   // 3. Check preRegisteredUsers if isAccountCreated === true OR if found in local
+  // 3. Check preRegisteredUsers collection
   try {
     const preUsersCol = collection(db, 'preRegisteredUsers');
     const preSnap = await getDocs(preUsersCol);
     const matchedPre = preSnap.docs.find(d => {
       const data = d.data();
       const em = data.email?.toLowerCase();
-      const mat = data.matricule?.toLowerCase();
+      const mat = (data.matricule || data.studentId || '').toString().toLowerCase();
       const cleanMat = mat?.replace(/[^a-z0-9]/g, '');
       return (
-        (data.isAccountCreated === true || data.authUid) &&
-        (em === normId || mat === normId || (cleanStr.length > 0 && cleanMat === cleanStr))
+        em === normId || mat === normId || (cleanStr.length > 0 && cleanMat === cleanStr)
       );
     });
     if (matchedPre) {
-      const preData = matchedPre.data();
+      const preData: any = { id: matchedPre.id, role: 'student', accessLevel: 1, ...matchedPre.data() };
       addEmail(preData.email);
-      if (preData.matricule) addEmail(formatAuthEmail(preData.matricule));
+      if (preData.matricule || preData.studentId) addEmail(formatAuthEmail(preData.matricule || preData.studentId));
       return { exists: true, userDoc: preData, knownEmails };
     }
   } catch (e) {}
 
-  // 4. Check students collection if they have authUid or accountCreated
+  // 4. Check students collection (match any registered or pre-registered student)
   try {
     const studentsCol = collection(db, 'students');
     const sSnap = await getDocs(studentsCol);
     const matchedStudent = sSnap.docs.find(d => {
       const data = d.data();
       const em = data.email?.toLowerCase();
-      const mat = data.matricule?.toLowerCase();
+      const mat = (data.matricule || data.studentId || '').toString().toLowerCase();
       const cleanMat = mat?.replace(/[^a-z0-9]/g, '');
       return (
-        (data.authUid || data.accountCreated === true || data.isAccountCreated === true) &&
-        (em === normId || mat === normId || (cleanStr.length > 0 && cleanMat === cleanStr) || data.studentPhone === identifier.trim() || data.parentPhone === identifier.trim())
+        em === normId || 
+        mat === normId || 
+        (cleanStr.length > 0 && cleanMat === cleanStr) || 
+        data.studentPhone === identifier.trim() || 
+        data.parentPhone === identifier.trim()
       );
     });
     if (matchedStudent) {
-      const sData = matchedStudent.data();
+      const sData: any = { id: matchedStudent.id, role: 'student', accessLevel: 1, ...matchedStudent.data() };
       addEmail(sData.email);
-      if (sData.matricule) addEmail(formatAuthEmail(sData.matricule));
+      if (sData.matricule || sData.studentId) addEmail(formatAuthEmail(sData.matricule || sData.studentId));
       return { exists: true, userDoc: sData, knownEmails };
     }
   } catch (e) {}
@@ -1038,14 +1159,31 @@ export const checkUserAccountExists = async (identifier: string): Promise<{
       if (matchedLocal.matricule) addEmail(formatAuthEmail(matchedLocal.matricule));
       return { exists: true, userDoc: matchedLocal, knownEmails };
     }
+
+    const localStudents: any[] = JSON.parse(localStorage.getItem('school_db_students') || '[]');
+    const matchedLocalStud = localStudents.find((s: any) => {
+      const em = s.email?.toLowerCase();
+      const mat = (s.matricule || s.studentId || '').toString().toLowerCase();
+      const cleanMat = mat?.replace(/[^a-z0-9]/g, '');
+      return (
+        em === normId || 
+        mat === normId || 
+        (cleanStr.length > 0 && cleanMat === cleanStr)
+      );
+    });
+    if (matchedLocalStud) {
+      const sData = { id: String(matchedLocalStud.id), role: 'student', accessLevel: 1, ...matchedLocalStud };
+      addEmail(sData.email);
+      if (sData.matricule || sData.studentId) addEmail(formatAuthEmail(sData.matricule || sData.studentId));
+      return { exists: true, userDoc: sData, knownEmails };
+    }
   } catch (e) {}
 
-  // 6. Check DEFAULT_PRE_REGISTERED_USERS if marked created
+  // 6. Check DEFAULT_PRE_REGISTERED_USERS
   const matchedDefault = DEFAULT_PRE_REGISTERED_USERS.find(u =>
-    u.isAccountCreated === true &&
-    (u.email?.toLowerCase() === normId ||
-     u.matricule?.toLowerCase() === normId ||
-     (cleanStr.length > 0 && u.matricule?.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanStr))
+    u.email?.toLowerCase() === normId ||
+    u.matricule?.toLowerCase() === normId ||
+    (cleanStr.length > 0 && u.matricule?.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanStr)
   );
   if (matchedDefault) {
     addEmail(matchedDefault.email);
@@ -1141,6 +1279,111 @@ export const syncTeacherDataToUser = async (user: User): Promise<User> => {
   return user;
 };
 
+export const syncStudentDataToUser = async (user: User): Promise<User> => {
+  if (!user) return user;
+  if (user.role !== 'student' && user.accessLevel !== 1) return user;
+
+  try {
+    let matchedStudent: any = null;
+
+    // 1. Try finding student in Firestore students collection
+    try {
+      const studentsCol = collection(db, 'students');
+      const studSnap = await getDocs(studentsCol);
+
+      for (const d of studSnap.docs) {
+        const data = d.data();
+        const sMat = (data.matricule || data.studentId || '').toString().toLowerCase().trim();
+        const uMat = (user.matricule || '').toString().toLowerCase().trim();
+        const cleanSMat = sMat.replace(/[^a-z0-9]/g, '');
+        const cleanUMat = uMat.replace(/[^a-z0-9]/g, '');
+
+        const isMatch =
+          String(d.id) === String(user.id) ||
+          data.authUid === user.id ||
+          (uMat && sMat && (sMat === uMat || (cleanUMat.length >= 3 && cleanSMat === cleanUMat))) ||
+          (user.name && data.name && user.name.toLowerCase().trim() === data.name.toLowerCase().trim());
+        if (isMatch) {
+          matchedStudent = { id: d.id, ...data };
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn("Error querying students collection during login sync:", e);
+    }
+
+    // 2. Fallback: check localStorage school_db_students
+    if (!matchedStudent) {
+      try {
+        const localStudents: any[] = JSON.parse(localStorage.getItem('school_db_students') || '[]');
+        matchedStudent = localStudents.find(s => {
+          const sMat = (s.matricule || s.studentId || '').toString().toLowerCase().trim();
+          const uMat = (user.matricule || '').toString().toLowerCase().trim();
+          const cleanSMat = sMat.replace(/[^a-z0-9]/g, '');
+          const cleanUMat = uMat.replace(/[^a-z0-9]/g, '');
+
+          return (
+            String(s.id) === String(user.id) ||
+            s.authUid === user.id ||
+            (uMat && sMat && (sMat === uMat || (cleanUMat.length >= 3 && cleanSMat === cleanUMat))) ||
+            (user.name && s.name && user.name.toLowerCase().trim() === s.name.toLowerCase().trim())
+          );
+        });
+      } catch (e) {}
+    }
+
+    if (matchedStudent) {
+      const updatedUser: User = {
+        ...user,
+        name: matchedStudent.name || user.name,
+        assignedClass: matchedStudent.class || matchedStudent.assignedClass || user.assignedClass || 'Terminale D1',
+        matricule: matchedStudent.matricule || matchedStudent.studentId || user.matricule,
+        photo: matchedStudent.photo || matchedStudent.photoUrl || user.photo,
+        birthDate: matchedStudent.birthDate || user.birthDate,
+        birthPlace: matchedStudent.birthPlace || user.birthPlace,
+        gender: matchedStudent.gender || user.gender,
+        parentPhone: matchedStudent.parentPhone || user.parentPhone,
+        studentPhone: matchedStudent.studentPhone || matchedStudent.phone || user.studentPhone,
+        phone: matchedStudent.studentPhone || matchedStudent.phone || user.phone,
+        assignedStatus: matchedStudent.assignedStatus || user.assignedStatus || 'affecte'
+      };
+
+      // Persist to users collection doc in Firestore so it remains saved
+      if (user.id) {
+        setDoc(doc(db, 'users', String(user.id)), sanitizeForFirestore({
+          ...updatedUser,
+          updatedAt: serverTimestamp()
+        }), { merge: true }).catch(() => {});
+      }
+
+      const sessionStr = localStorage.getItem('school_user_session');
+      if (sessionStr) {
+        try {
+          const parsed = JSON.parse(sessionStr);
+          localStorage.setItem('school_user_session', JSON.stringify({ ...parsed, ...updatedUser }));
+        } catch (e) {}
+      }
+
+      return updatedUser;
+    }
+  } catch (e) {
+    console.warn("Error syncing student data to user:", e);
+  }
+
+  return user;
+};
+
+export const syncUserData = async (user: User): Promise<User> => {
+  if (!user) return user;
+  if (user.role === 'teacher' || user.accessLevel === 3) {
+    return await syncTeacherDataToUser(user);
+  }
+  if (user.role === 'student' || user.accessLevel === 1) {
+    return await syncStudentDataToUser(user);
+  }
+  return user;
+};
+
 export const loginUserAccount = async (
   identifier: string,
   pass: string,
@@ -1149,6 +1392,7 @@ export const loginUserAccount = async (
   section?: 'Primaire' | 'Secondaire'
 ): Promise<User> => {
   const passToUse = pass || 'ecole2024';
+  const isStudentLogin = role === 'student' || accessLevel === 1;
 
   // Check whether user account exists in Firestore / local / pre-reg
   const accountCheck = await checkUserAccountExists(identifier);
@@ -1208,7 +1452,7 @@ export const loginUserAccount = async (
         throw new Error(`Votre compte appartient à la section ${rawUser.section === 'Primaire' ? 'Primaire' : 'Secondaire'}. Connexion refusée dans la section ${section === 'Primaire' ? 'Primaire' : 'Secondaire'}.`);
       }
 
-      return await syncTeacherDataToUser(rawUser);
+      return await syncUserData(rawUser);
     } catch (e: any) {
       if (e.message?.includes("Connexion refusée")) {
         throw e;
@@ -1219,12 +1463,12 @@ export const loginUserAccount = async (
         if (isTargetRole && section && rawUser.section && rawUser.section !== section) {
           throw new Error(`Votre compte appartient à la section ${rawUser.section === 'Primaire' ? 'Primaire' : 'Secondaire'}. Connexion refusée dans la section ${section === 'Primaire' ? 'Primaire' : 'Secondaire'}.`);
         }
-        return await syncTeacherDataToUser(rawUser);
+        return await syncUserData(rawUser);
       }
     }
   }
 
-  // Fallback check against Firestore user document if account exists
+  // Fallback check against Firestore user document / pre-registration if account exists
   if (accountCheck.exists && accountCheck.userDoc) {
     const uDoc = accountCheck.userDoc;
 
@@ -1237,26 +1481,102 @@ export const loginUserAccount = async (
     const storedPin = uDoc.pinCode;
     const storedPass = uDoc.password;
 
-    // Check if provided password matches pinCode, password, or standard defaults
-    const isPasswordValid = 
-      !pass || 
-      pass === storedPin || 
-      pass === storedPass || 
-      storedPin === '0000' ||
-      pass === 'ecole2024' ||
-      (storedPass && pass === storedPass) ||
-      (!storedPin && !storedPass);
+    // For students: if the matricule matches an existing record, authenticate the student directly
+    const isStudentDoc = uDoc.role === 'student' || isStudentLogin;
+    const isPasswordValid = isStudentDoc
+      ? (!storedPin && !storedPass) ||
+        !pass ||
+        pass === storedPin ||
+        pass === storedPass ||
+        storedPin === '0000' ||
+        pass === 'ecole2024' ||
+        pass === (uDoc.matricule || uDoc.studentId) ||
+        pass === '0000' ||
+        (storedPass && pass === storedPass)
+      : (!pass ||
+         pass === storedPin ||
+         pass === storedPass ||
+         storedPin === '0000' ||
+         pass === 'ecole2024' ||
+         (storedPass && pass === storedPass) ||
+         (!storedPin && !storedPass));
 
     if (isPasswordValid) {
-      // Silently attempt to create Auth user if missing so future Firebase Auth calls succeed
       const emailToCreate = candidateEmails[0] || formatAuthEmail(identifier);
-      if (passToUse && passToUse.length >= 6) {
-        createUserWithEmailAndPassword(auth, emailToCreate, passToUse).catch(() => {});
+      let authUid = uDoc.authUid || uDoc.uid;
+
+      if (!authUid || authUid.startsWith('usr-') || authUid.startsWith('auto-') || authUid.startsWith('pre-') || authUid.startsWith('local-')) {
+        try {
+          if (passToUse && passToUse.length >= 6) {
+            const createdCred = await createUserWithEmailAndPassword(auth, emailToCreate, passToUse);
+            authUid = createdCred.user.uid;
+          }
+        } catch (_) {}
       }
-      const rawUser = { id: uDoc.id || uDoc.authUid || uDoc.uid || `user-${Date.now()}`, ...uDoc } as User;
-      return await syncTeacherDataToUser(rawUser);
+
+      if (!authUid) {
+        authUid = uDoc.id && !uDoc.id.startsWith('pre-') && !uDoc.id.startsWith('local-') 
+          ? String(uDoc.id) 
+          : `usr-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      }
+
+      const sMatricule = uDoc.matricule || uDoc.studentId || identifier;
+      const rawUser: User = {
+        name: uDoc.name || `${uDoc.firstName || ''} ${uDoc.lastName || ''}`.trim() || 'Élève',
+        role: uDoc.role || role || 'student',
+        accessLevel: uDoc.accessLevel || accessLevel || 1,
+        matricule: sMatricule,
+        assignedClass: uDoc.class || uDoc.assignedClass || 'Terminale D1',
+        assignedClasses: uDoc.assignedClasses || [uDoc.class || uDoc.assignedClass || 'Terminale D1'],
+        phone: uDoc.studentPhone || uDoc.phone || '',
+        studentPhone: uDoc.studentPhone || uDoc.phone || '',
+        parentPhone: uDoc.parentPhone || '',
+        email: uDoc.email || (identifier.includes('@') ? identifier : undefined),
+        password: pass || uDoc.password || 'ecole2024',
+        pinCode: pass || uDoc.pinCode || '0000',
+        photo: uDoc.photo || uDoc.photoUrl || '',
+        section: uDoc.section || section || 'Secondaire',
+        isAccountCreated: true,
+        accountCreated: true,
+        ...uDoc,
+        id: authUid,
+        authUid: authUid,
+      } as User;
+
+      // Persist to users collection in Firestore
+      await setDoc(doc(db, 'users', authUid), sanitizeForFirestore({
+        ...rawUser,
+        accountCreated: true,
+        isAccountCreated: true,
+        updatedAt: serverTimestamp()
+      }), { merge: true }).catch(() => {});
+
+      // Link and mark in students collection
+      if (rawUser.role === 'student' || rawUser.accessLevel === 1) {
+        const studentDocId = uDoc.studentDocId || uDoc.id || sMatricule;
+        if (studentDocId) {
+          await setDoc(doc(db, 'students', String(studentDocId)), sanitizeForFirestore({
+            authUid: authUid,
+            accountCreated: true,
+            isAccountCreated: true,
+            password: pass || uDoc.password || 'ecole2024',
+            pinCode: pass || uDoc.pinCode || '0000'
+          }), { merge: true }).catch(() => {});
+        }
+      }
+
+      // Mark preRegisteredUsers if doc exists
+      if (uDoc.id) {
+        updateDoc(doc(db, 'preRegisteredUsers', String(uDoc.id)), {
+          authUid: authUid,
+          accountCreated: true,
+          isAccountCreated: true
+        }).catch(() => {});
+      }
+
+      return await syncUserData(rawUser);
     } else {
-      const customErr = new Error("Mot de passe incorrect. Veuillez réessayer.");
+      const customErr = new Error("Mot de passe incorrect. Veuillez vérifier votre mot de passe.");
       (customErr as any).code = "WRONG_PASSWORD";
       throw customErr;
     }
@@ -1270,15 +1590,66 @@ export const loginUserAccount = async (
       matricule: identifier,
       email: identifier,
       phone: identifier,
+      role: role || (isStudentLogin ? 'student' : undefined)
     });
-    
-    if (preRegistered && !preRegistered.isAccountCreated) {
-      const customErr = new Error("Votre profil a été enregistré par votre établissement, mais vous n'avez pas encore créé votre compte. Veuillez utiliser l'onglet Inscription pour créer votre compte.");
+
+    if (preRegistered) {
+      // If student: "si le matricule correspond a un dans l'application ces que ces la personne"
+      if (preRegistered.role === 'student' || isStudentLogin) {
+        const authUid = preRegistered.id && !preRegistered.id.startsWith('pre-') && !preRegistered.id.startsWith('auto-')
+          ? String(preRegistered.id)
+          : `usr-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+
+        const sMatricule = preRegistered.matricule || preRegistered.studentId || identifier;
+        const rawUser: User = {
+          id: authUid,
+          name: preRegistered.name || 'Élève',
+          role: 'student',
+          accessLevel: 1,
+          matricule: sMatricule,
+          assignedClass: preRegistered.assignedClass || 'Terminale D1',
+          assignedClasses: preRegistered.assignedClasses || ['Terminale D1'],
+          email: preRegistered.email || formatAuthEmail(identifier),
+          password: pass || 'ecole2024',
+          pinCode: pass || '0000',
+          photo: preRegistered.photo || '',
+          section: section || 'Secondaire',
+          studentPhone: preRegistered.studentPhone || preRegistered.phone || '',
+          parentPhone: preRegistered.parentPhone || '',
+          phone: preRegistered.phone || '',
+          isAccountCreated: true,
+          accountCreated: true,
+          ...(preRegistered.existingStudentData || {})
+        } as User;
+
+        await setDoc(doc(db, 'users', authUid), sanitizeForFirestore({
+          ...rawUser,
+          updatedAt: serverTimestamp()
+        }), { merge: true }).catch(() => {});
+
+        if (preRegistered.id) {
+          updateDoc(doc(db, 'preRegisteredUsers', String(preRegistered.id)), {
+            authUid: authUid,
+            accountCreated: true,
+            isAccountCreated: true
+          }).catch(() => {});
+        }
+
+        return await syncUserData(rawUser);
+      }
+
+      const customErr = new Error("Votre profil a été préenregistré par l'établissement. Veuillez utiliser l'onglet 'Créer un compte' pour finaliser votre inscription.");
       (customErr as any).code = "ACCOUNT_NOT_CREATED";
       throw customErr;
     }
-    
-    const customErr = new Error("Aucun compte n'a été trouvé avec ces informations. Veuillez d'abord vous inscrire avant de vous connecter.");
+
+    if (isStudentLogin) {
+      const customErr = new Error(`Matricule "${identifier}" non reconnu. Aucun élève ne correspond à ce matricule dans l'établissement. Veuillez vérifier votre matricule ou contacter l'administration.`);
+      (customErr as any).code = "STUDENT_NOT_FOUND";
+      throw customErr;
+    }
+
+    const customErr = new Error("Aucun compte n'a été trouvé avec ces informations. Veuillez vérifier vos identifiants ou créer un compte.");
     (customErr as any).code = "ACCOUNT_NOT_FOUND";
     throw customErr;
   }

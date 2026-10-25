@@ -307,19 +307,32 @@ export const StudentSuppliesModal: React.FC<StudentSuppliesModalProps> = ({
     });
   };
 
+  const handleFileSelected = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (file.type.startsWith('image/')) {
+        compressImage(file, 1000, 0.75).then(resolve).catch(reject);
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
   // Upload student photo for an exercise
   const handleStudentPhotoSelected = async (exerciseId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      const compressedDataUrl = await compressImage(file, 1000, 0.75);
-      if (compressedDataUrl) {
-        saveStudentExercisePhoto(studentId, exerciseId, compressedDataUrl);
-        setStudentPhotos(prev => ({ ...prev, [exerciseId]: compressedDataUrl }));
+      const dataUrl = await handleFileSelected(file);
+      if (dataUrl) {
+        saveStudentExercisePhoto(studentId, exerciseId, dataUrl);
+        setStudentPhotos(prev => ({ ...prev, [exerciseId]: dataUrl }));
       }
     } catch (err) {
-      console.error("Erreur enregistrement photo:", err);
+      console.error("Erreur enregistrement fichier:", err);
     }
     // reset input
     e.target.value = '';
@@ -341,12 +354,12 @@ export const StudentSuppliesModal: React.FC<StudentSuppliesModalProps> = ({
     if (!file) return;
 
     try {
-      const compressedDataUrl = await compressImage(file, 1000, 0.75);
-      if (compressedDataUrl) {
-        setNewImageUrl(compressedDataUrl);
+      const dataUrl = await handleFileSelected(file);
+      if (dataUrl) {
+        setNewImageUrl(dataUrl);
       }
     } catch (err) {
-      console.error("Erreur image prof:", err);
+      console.error("Erreur fichier prof:", err);
     }
     e.target.value = '';
   };
@@ -751,7 +764,7 @@ export const StudentSuppliesModal: React.FC<StudentSuppliesModalProps> = ({
                             <span>Prendre / Choisir une photo</span>
                             <input 
                               type="file" 
-                              accept="image/*" 
+                              accept="image/*,.pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
                               onChange={handleTeacherPhotoSelected} 
                               className="hidden" 
                             />

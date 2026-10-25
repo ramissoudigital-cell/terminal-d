@@ -85,8 +85,16 @@ export interface Student {
   mainTeacherName?: string;
   teacherSignature?: string;
   directorName?: string;
-  directorSignature?: string;
   stampMode?: 'blank' | 'digital';
+  matricule?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  email?: string;
+  parentContact?: string;
+  authUid?: string;
+  accountCreated?: boolean;
+  isAccountCreated?: boolean;
 }
 
 export interface Teacher {

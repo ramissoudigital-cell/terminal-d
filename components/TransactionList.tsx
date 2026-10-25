@@ -244,36 +244,184 @@ export const getSubjectCoef = (studentClass: string | undefined, subjectName: st
       return 1;
 };
 
-export const isSubjectMatch = (tSub?: string, sSub?: string) => {
+export const normalizeSubjectCanonical = (raw?: string): string => {
+  if (!raw) return '';
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[._\-/\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Hist-Géo / Histoire-Géographie / HG
+  if (
+    s === 'hg' ||
+    s.startsWith('hg ') ||
+    s.endsWith(' hg') ||
+    s.includes('hist') ||
+    s.includes('geo') ||
+    s.includes('gio') ||
+    s.includes('histoire') ||
+    s.includes('geographie')
+  ) {
+    return 'hg';
+  }
+
+  // EPS vs PC
+  if (
+    s === 'eps' ||
+    s.startsWith('eps ') ||
+    s.endsWith(' eps') ||
+    s.includes('sport') ||
+    s.includes('physique et sportive') ||
+    s.includes('education physique')
+  ) {
+    return 'eps';
+  }
+
+  // Physique-Chimie (PC)
+  if (
+    s === 'pc' ||
+    s.startsWith('pc ') ||
+    s.endsWith(' pc') ||
+    s.includes('physique') ||
+    s.includes('chimie')
+  ) {
+    return 'pc';
+  }
+
+  // SVT (Sciences de la Vie et de la Terre, Biologie)
+  if (
+    s === 'svt' ||
+    s.startsWith('svt ') ||
+    s.endsWith(' svt') ||
+    s.includes('sciences de la vie') ||
+    s.includes('biologie') ||
+    s.includes('bio')
+  ) {
+    return 'svt';
+  }
+
+  // Mathématiques
+  if (s.includes('math')) {
+    return 'math';
+  }
+
+  // Français
+  if (s.includes('fran') || s.includes('lettre')) {
+    return 'francais';
+  }
+
+  // Anglais
+  if (s.includes('angl') || s.includes('english')) {
+    return 'anglais';
+  }
+
+  // Philosophie
+  if (s.includes('philo')) {
+    return 'philo';
+  }
+
+  // Informatique
+  if (s.includes('info') || s.includes('tic')) {
+    return 'info';
+  }
+
+  // Espagnol
+  if (s.includes('espagnol') || s === 'esp') {
+    return 'espagnol';
+  }
+
+  // Allemand
+  if (s.includes('allemand') || s === 'all') {
+    return 'allemand';
+  }
+
+  // Arts Plastiques
+  if (s.includes('art') || s.includes('dessin')) {
+    return 'arts';
+  }
+
+  // Musique
+  if (s.includes('musiq') || s.includes('musicale')) {
+    return 'musique';
+  }
+
+  // EDHC
+  if (s.includes('edhc') || s.includes('droits de l homme') || s.includes('citoyennete')) {
+    return 'edhc';
+  }
+
+  // Conduite
+  if (s.includes('conduit') || s.includes('disciplin') || s.includes('comport')) {
+    return 'conduite';
+  }
+
+  // Economie
+  if (s.includes('econo') || s === 'eco') {
+    return 'eco';
+  }
+
+  // Droit
+  if (s.includes('droit')) {
+    return 'droit';
+  }
+
+  return s;
+};
+
+export const isSubjectMatch = (tSub?: string, sSub?: string): boolean => {
     if (!tSub || !sSub) return true;
-    const t = tSub.toLowerCase().trim();
-    const s = sSub.toLowerCase().trim();
+    const t = tSub.trim();
+    const s = sSub.trim();
+    if (t === s) return true;
     
+    // Multiple teacher subjects support (comma-separated)
+    if (t.includes(',')) {
+      const parts = t.split(',').map(p => p.trim()).filter(Boolean);
+      return parts.some(p => isSubjectMatch(p, s));
+    }
+    if (s.includes(',')) {
+      const parts = s.split(',').map(p => p.trim()).filter(Boolean);
+      return parts.some(p => isSubjectMatch(t, p));
+    }
+
+    // Canonical matching
+    const canonT = normalizeSubjectCanonical(t);
+    const canonS = normalizeSubjectCanonical(s);
+
+    if (canonT && canonS && canonT === canonS) {
+      return true;
+    }
+
     // Prevent "Physique-Chimie" from matching "Education Physique et Sportive"
-    const isT_EPS = t.includes('éducation physique') || t.includes('education physique') || t === 'eps';
-    const isS_EPS = s.includes('éducation physique') || s.includes('education physique') || s === 'eps';
-    const isT_PC = t.includes('physique-chimie') || t === 'pc' || t === 'physique' || t === 'chimie';
-    const isS_PC = s.includes('physique-chimie') || s === 'pc' || s === 'physique' || s === 'chimie';
+    const isT_EPS = canonT === 'eps';
+    const isS_EPS = canonS === 'eps';
+    const isT_PC = canonT === 'pc';
+    const isS_PC = canonS === 'pc';
 
     if ((isT_EPS && isS_PC) || (isT_PC && isS_EPS)) {
       return false;
     }
 
-    const isT_All = t.includes('allemand');
-    const isS_All = s.includes('allemand');
-    const isT_Esp = t.includes('espagnol');
-    const isS_Esp = s.includes('espagnol');
+    // Prevent "Allemand" from matching "Espagnol"
+    const isT_All = canonT === 'allemand';
+    const isS_All = canonS === 'allemand';
+    const isT_Esp = canonT === 'espagnol';
+    const isS_Esp = canonS === 'espagnol';
 
     if ((isT_All && isS_Esp) || (isT_Esp && isS_All)) {
       return false;
     }
 
-    if (t === s || t.includes(s) || s.includes(t)) return true;
-    if (t.includes('math') && s.includes('math')) return true;
-    if (isT_PC && isS_PC) return true;
+    const rawT = t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const rawS = s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+    if (rawT === rawS || rawT.includes(rawS) || rawS.includes(rawT)) return true;
     
-    const parts = t.split(',').map(p => p.trim());
-    return parts.some(p => p && (p === s || p.includes(s) || s.includes(p)));
+    return false;
   };
 
 export const TransactionList: React.FC<TransactionListProps> = ({ subjects, onSelectSubject, currentUser, studentClass }) => {

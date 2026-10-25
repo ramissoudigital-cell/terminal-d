@@ -230,16 +230,17 @@ export const FicheIdentificationPage: React.FC<FicheIdentificationPageProps> = (
     if (!selectedClassItem) return [];
     const className = selectedClassItem.name;
     const classCode = selectedClassItem.code;
-    return allStudents.filter(s => {
+    const filtered = allStudents.filter(s => {
       const matchClass = s.class === className || s.class === classCode;
       const matchSearch = !searchStudentTerm || 
-        s.name.toLowerCase().includes(searchStudentTerm.toLowerCase()) || 
+        (s.name || '').toLowerCase().includes(searchStudentTerm.toLowerCase()) || 
         (s.studentId && s.studentId.toLowerCase().includes(searchStudentTerm.toLowerCase()));
       if (currentUser?.role === 'parent') {
         return matchClass && matchSearch && isParentChild(currentUser, s, allStudents);
       }
       return matchClass && matchSearch;
     });
+    return filtered.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr', { sensitivity: 'base' }));
   }, [allStudents, selectedClassItem, searchStudentTerm, currentUser]);
 
   // Editable fields for the selected student

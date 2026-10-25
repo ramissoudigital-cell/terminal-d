@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Student, ClassItem, getSubjectsForClass, GradeItem, AnalyticsData } from '../types';
 import { mockClasses } from '../data/mockData';
-import { getSubjectCoef } from './TransactionList';
+import { getSubjectCoef, isSubjectMatch } from './TransactionList';
 
 interface StudentsPageProps {
   students?: Student[];
@@ -41,52 +41,12 @@ export const STATS_OFFICIAL_SUBJECTS: string[] = [
 
 // Helper de correspondance tolérant pour reconnaître les matières (y compris variantes et fautes de frappe)
 export const isSameSubject = (nameA?: string, nameB?: string): boolean => {
-  if (!nameA || !nameB) return false;
-  const a = nameA.trim().toLowerCase();
-  const b = nameB.trim().toLowerCase();
-  if (a === b) return true;
-
-  // Informatique
-  const isInfo = (s: string) => s.includes('informatique') || s === 'info';
-  if (isInfo(a) && isInfo(b)) return true;
-
-  // Physique-Chimie (Physique.Chimie, Physique-Chimie, Physique, Chimie)
-  const isPC = (s: string) => s.includes('physique') || s.includes('chimie');
-  if (isPC(a) && isPC(b)) return true;
-
-  // SVT (Sciences de la Vie et de la Terre, Biologie)
-  const isSVT = (s: string) => s === 'svt' || s.includes('sciences de la vie') || s.includes('biologie');
-  if (isSVT(a) && isSVT(b)) return true;
-
-  // Philosophie (Philosaphie, Philo)
-  const isPhilo = (s: string) => s.includes('philo');
-  if (isPhilo(a) && isPhilo(b)) return true;
-
-  // Mathématiques (Maths, Math)
-  const isMath = (s: string) => s.includes('math');
-  if (isMath(a) && isMath(b)) return true;
-
-  // Français (Françals, Francais)
-  const isFrancais = (s: string) => s.includes('fran');
-  if (isFrancais(a) && isFrancais(b)) return true;
-
-  // Anglais
-  const isAnglais = (s: string) => s.includes('angl');
-  if (isAnglais(a) && isAnglais(b)) return true;
-
-  // Hist-Géo (Hist-Gio, Histoire-Géographie, Histoire-Geo, Histoire, Géographie)
-  const isHistGeo = (s: string) => s.includes('hist') || s.includes('géo') || s.includes('geo') || s.includes('gio');
-  if (isHistGeo(a) && isHistGeo(b)) return true;
-
-  // EPS (Éducation Physique et Sportive, Sport)
-  const isEPS = (s: string) => s === 'eps' || s.includes('sport') || s.includes('physique et sportive');
-  if (isEPS(a) && isEPS(b)) return true;
-
-  return false;
+  return isSubjectMatch(nameA, nameB);
 };
 
 // Couleurs harmonieuses pour les matières
 const SUBJECT_HEX_COLORS: Record<string, string> = {
+  'Conduite': '#059669',
   'Informatique': '#0284c7',
   'Physique-Chimie': '#f59e0b',
   'Physique.Chimie': '#f59e0b',

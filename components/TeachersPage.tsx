@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, Phone, MoreVertical, Calendar, X, Clock, ChevronLeft, ChevronRight, Lock, Plus, Edit3, Trash2, Save, MapPin, Search, FileText, Printer, CheckCircle2, Award, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Mail, Phone, MoreVertical, Calendar, X, Clock, ChevronLeft, ChevronRight, Lock, Plus, Edit3, Trash2, Save, MapPin, Search, FileText, Printer, CheckCircle2, Award, Sparkles, Camera, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Teacher, User, getSubjectsForClass } from '../types';
 import { DailyScheduleMobileView, ScheduleEvent } from './DailyScheduleMobileView';
@@ -9,6 +9,7 @@ import ReflectiveCard from './ReflectiveCard';
 import { ProfileCard } from './ProfileCard';
 import { saveRealtimeDocument, deleteRealtimeDocument } from '../src/services/firebaseService';
 import { getTeacherIndividualAccreditationCode, setTeacherIndividualAccreditationCode, setSubjectAccreditationCode, normalizeSubjectKey } from '../src/utils/accreditationUtils';
+import { isSubjectMatch } from './TransactionList';
 
 interface TeachersPageProps {
     teachers?: Teacher[];
@@ -458,10 +459,30 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       dob: '',
       subject: 'Mathématiques',
       level: 'Secondaire',
-      assignedClasses: [],
+      assignedClasses: [] as string[],
       phone: '',
-      email: ''
+      email: '',
+      photo: ''
   });
+
+  const teacherPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTeacherPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("L'image ne doit pas dépasser 5 Mo");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setNewTeacherForm(prev => ({ ...prev, photo: reader.result as string }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleRegisterTeacher = (e: React.FormEvent) => {
       e.preventDefault();
@@ -477,7 +498,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
           level: newTeacherForm.level,
           email: newTeacherForm.email.trim() || '',
           phone: newTeacherForm.phone.trim() || '',
-          photo: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 80000000000)}?auto=format&fit=crop&q=80&w=200`,
+          photo: newTeacherForm.photo || `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 80000000000)}?auto=format&fit=crop&q=80&w=200`,
           assignedClasses: newTeacherForm.assignedClasses,
           status: 'Inactif',
           uid: null,
@@ -497,9 +518,15 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
 
       setNewTeacherForm({
           name: '',
+          matricule: '',
+          gender: 'M',
+          dob: '',
           subject: 'Mathématiques',
+          level: 'Secondaire',
+          assignedClasses: [],
           phone: '',
-          email: ''
+          email: '',
+          photo: ''
       });
       setIsAddTeacherModalOpen(false);
   };
@@ -551,11 +578,16 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
   const studentClass = restrictedClass || currentUser?.assignedClass || (currentUser?.section === 'Primaire' ? 'CM2' : 'Terminale D1');
 
   // Find student record if available
-  const matchedStudent = allStudents.find((s: any) => 
-    s.studentId === currentUser?.matricule || 
-    (currentUser?.name && s.name.toLowerCase() === currentUser.name.toLowerCase()) ||
-    s.class === studentClass
-  );
+  const curUserName = (currentUser?.name || '').toLowerCase().trim();
+  const curUserMatricule = (currentUser?.matricule || '').toLowerCase().trim();
+  const matchedStudent = (allStudents || []).find((s: any) => {
+    if (!s) return false;
+    const sMat = (s.studentId || s.matricule || '').toLowerCase().trim();
+    const sName = (s.name || '').toLowerCase().trim();
+    return (Boolean(curUserMatricule) && sMat === curUserMatricule) || 
+           (Boolean(curUserName) && Boolean(sName) && sName === curUserName) ||
+           (Boolean(studentClass) && s.class === studentClass);
+  });
   
   const [mobileDayIndex, setMobileDayIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -795,10 +827,10 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       if (isSelf) {
         if (searchTerm.trim()) {
           const term = searchTerm.toLowerCase();
-          return t.name.toLowerCase().includes(term) ||
-                 t.subject.toLowerCase().includes(term) ||
-                 (t.email && t.email.toLowerCase().includes(term)) ||
-                 (t.phone && t.phone.toLowerCase().includes(term));
+          return (t.name || '').toLowerCase().includes(term) ||
+                 (t.subject || '').toLowerCase().includes(term) ||
+                 (Boolean(t.email) && t.email!.toLowerCase().includes(term)) ||
+                 (Boolean(t.phone) && t.phone!.toLowerCase().includes(term));
         }
         return true;
       }
@@ -841,10 +873,10 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
 
       if (!searchTerm.trim()) return true;
       const term = searchTerm.toLowerCase();
-      return t.name.toLowerCase().includes(term) ||
-             t.subject.toLowerCase().includes(term) ||
-             (t.email && t.email.toLowerCase().includes(term)) ||
-             (t.phone && t.phone.toLowerCase().includes(term));
+      return (t.name || '').toLowerCase().includes(term) ||
+             (t.subject || '').toLowerCase().includes(term) ||
+             (Boolean(t.email) && t.email!.toLowerCase().includes(term)) ||
+             (Boolean(t.phone) && t.phone!.toLowerCase().includes(term));
     });
 
     // Safety fallback: if strict class filtering produces 0 teachers, but teachers exist in effectiveTeachers for this section,
@@ -934,12 +966,13 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                   <tbody class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
                     ${list.map((t, idx) => {
                         let colorClass = "bg-gray-50 text-gray-700 border-gray-200";
-                        if (t.subject.toLowerCase().includes('math')) colorClass = "bg-blue-50 text-blue-700 border-blue-200";
-                        else if (t.subject.toLowerCase().includes('fran')) colorClass = "bg-rose-50 text-rose-700 border-rose-200";
-                        else if (t.subject.toLowerCase().includes('phys')) colorClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                        else if (t.subject.toLowerCase().includes('svt') || t.subject.toLowerCase().includes('science')) colorClass = "bg-green-50 text-green-700 border-green-200";
-                        else if (t.subject.toLowerCase().includes('angl')) colorClass = "bg-purple-50 text-purple-700 border-purple-200";
-                        else if (t.subject.toLowerCase().includes('hist')) colorClass = "bg-amber-50 text-amber-700 border-amber-200";
+                        const sSubj = (t.subject || '').toLowerCase();
+                        if (sSubj.includes('math')) colorClass = "bg-blue-50 text-blue-700 border-blue-200";
+                        else if (sSubj.includes('fran')) colorClass = "bg-rose-50 text-rose-700 border-rose-200";
+                        else if (sSubj.includes('phys')) colorClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                        else if (sSubj.includes('svt') || sSubj.includes('science')) colorClass = "bg-green-50 text-green-700 border-green-200";
+                        else if (sSubj.includes('angl')) colorClass = "bg-purple-50 text-purple-700 border-purple-200";
+                        else if (sSubj.includes('hist')) colorClass = "bg-amber-50 text-amber-700 border-amber-200";
                         
                         return `
                         <tr class="hover:bg-slate-50 transition-colors">
@@ -1005,6 +1038,17 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                 </p>
             </div>
             <div className="flex items-center space-x-3">
+                {!isLevel1 && (
+                  <button
+                      type="button"
+                      onClick={() => setIsAddTeacherModalOpen(true)}
+                      className="hidden md:flex items-center gap-2 bg-white/20 px-4 py-2 rounded-xl border border-white/30 text-white hover:bg-white/30 transition-all font-bold text-sm shadow-sm active:scale-95 cursor-pointer"
+                      title="Ajouter une nouvelle carte"
+                  >
+                      <Plus size={18} strokeWidth={2.5} />
+                      <span>Ajouter une nouvelle carte</span>
+                  </button>
+                )}
                 {currentUser?.role !== 'student' && currentUser?.accessLevel !== 1 && currentUser?.role !== 'teacher' && currentUser?.accessLevel !== 3 && (
                   <button
                       onClick={handlePrint}
@@ -1085,7 +1129,18 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                     <h1 className="text-white text-[24px] font-bold tracking-tight truncate">Professeurs</h1>
                     {isLevel1 && <p className="text-white/80 text-xs font-semibold truncate">Classe : {studentClass || 'Non spécifiée'}</p>}
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 items-center">
+                    {!isLevel1 && (
+                      <button 
+                          type="button"
+                          onClick={() => setIsAddTeacherModalOpen(true)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/40 hover:bg-white/60 text-slate-900 backdrop-blur-md border border-white/50 text-xs font-bold transition-all shadow-sm active:scale-95"
+                          title="Ajouter une nouvelle carte"
+                      >
+                          <Plus size={14} strokeWidth={2.5} />
+                          <span>Ajouter une carte</span>
+                      </button>
+                    )}
                     <button 
                         onClick={() => setShowMobileSearch(true)}
                         className="w-9 h-9 rounded-full bg-white/40 flex items-center justify-center backdrop-blur-md border border-white/50 hover:bg-white/60 transition-colors"
@@ -1558,7 +1613,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                                             onChange={e => setFormData({...formData, subject: e.target.value})}
                                             className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-sky-500 rounded-xl px-3 py-2 outline-none font-medium text-gray-800 transition-all"
                                         >
-                                            {getSubjectsForClass(formData.room || '').map(s => <option key={s} value={s} disabled={currentUser?.role === "teacher" && currentUser?.subject && s !== currentUser.subject}>{s}</option>)}
+                                            {getSubjectsForClass(formData.room || '').map(s => <option key={s} value={s} disabled={currentUser?.role === "teacher" && currentUser?.subject && !isSubjectMatch(currentUser.subject, s)}>{s}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -1766,7 +1821,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                                         onChange={e => setFormData({...formData, subject: e.target.value})}
                                         className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-sky-500 rounded-xl px-3 py-2 outline-none font-medium text-gray-800 transition-all"
                                     >
-                                        {getSubjectsForClass(formData.room || '').map(s => <option key={s} value={s} disabled={currentUser?.role === "teacher" && currentUser?.subject && s !== currentUser.subject}>{s}</option>)}
+                                        {getSubjectsForClass(formData.room || '').map(s => <option key={s} value={s} disabled={currentUser?.role === "teacher" && currentUser?.subject && !isSubjectMatch(currentUser.subject, s)}>{s}</option>)}
                                     </select>
                                 </div>
                                 <div>
@@ -1930,12 +1985,12 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
               <div className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-center gap-3">
                 <Mail className="text-slate-400 shrink-0" size={20} />
                 <span className="text-base font-extrabold text-slate-800 truncate">
-                  {teacherToEmail.email || `${teacherToEmail.name.toLowerCase().replace(/\s+/g, '.')}@ecole.com`}
+                  {teacherToEmail.email || `${(teacherToEmail.name || 'professeur').toLowerCase().replace(/\s+/g, '.')}@ecole.com`}
                 </span>
               </div>
 
               <a 
-                href={`mailto:${teacherToEmail.email || `${teacherToEmail.name.toLowerCase().replace(/\s+/g, '.')}@ecole.com`}`}
+                href={`mailto:${teacherToEmail.email || `${(teacherToEmail.name || 'professeur').toLowerCase().replace(/\s+/g, '.')}@ecole.com`}`}
                 className="w-full py-4 bg-slate-900 hover:bg-black text-white font-bold rounded-2xl shadow-lg flex items-center justify-center gap-3 active:scale-[0.98] transition-all text-base"
               >
                 <Mail size={20} />
@@ -1949,7 +2004,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       {/* Add Teacher Modal */}
       <AnimatePresence>
         {isAddTeacherModalOpen && (
-          <div className="fixed inset-0 z-[600] flex items-start justify-center p-4 pt-6 md:pt-10 pb-16 overflow-y-auto print:hidden">
+          <div className="fixed inset-0 z-[600] flex items-start justify-center p-4 pt-6 md:pt-12 pb-16 overflow-y-auto print:hidden">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -1958,15 +2013,16 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
               className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative z-10 bg-white rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl border border-slate-100 my-auto max-h-[85vh] overflow-y-auto"
+              initial={{ y: -80, opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -80, opacity: 0, scale: 0.98 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 280 }}
+              className="relative z-10 bg-white rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl border border-slate-100 my-2 max-h-[88vh] overflow-y-auto"
             >
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900">Enregistrer un Professeur</h3>
-                  <p className="text-xs text-slate-500 mt-1">Ajoute automatiquement une nouvelle ligne dans le tableau</p>
+                  <h3 className="text-xl font-bold text-slate-900">Ajouter une nouvelle carte</h3>
+                  <p className="text-xs text-slate-500 mt-1">Créer le profil et générer la carte du professeur</p>
                 </div>
                 <button
                   onClick={() => setIsAddTeacherModalOpen(false)}
@@ -1977,6 +2033,64 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
               </div>
 
               <form onSubmit={handleRegisterTeacher} className="space-y-4">
+                {/* Photo de profil de l'enseignant */}
+                <div className="flex flex-col items-center justify-center pb-2">
+                  <div className="relative group">
+                    <div className="w-24 h-24 rounded-full border-2 border-dashed border-indigo-300 overflow-hidden bg-slate-50 flex items-center justify-center shadow-inner group-hover:border-indigo-500 transition-colors">
+                      {newTeacherForm.photo ? (
+                        <img 
+                          src={newTeacherForm.photo} 
+                          alt="Aperçu photo" 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-slate-400 group-hover:text-indigo-600 transition-colors">
+                          <Camera size={26} />
+                          <span className="text-[10px] font-bold mt-1">Photo</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => teacherPhotoInputRef.current?.click()}
+                      className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-md active:scale-95 transition-all border-2 border-white cursor-pointer"
+                      title="Télécharger une photo"
+                    >
+                      <Upload size={13} />
+                    </button>
+
+                    {newTeacherForm.photo && (
+                      <button
+                        type="button"
+                        onClick={() => setNewTeacherForm(prev => ({ ...prev, photo: '' }))}
+                        className="absolute top-0 right-0 w-6 h-6 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer"
+                        title="Supprimer la photo"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  <input
+                    type="file"
+                    ref={teacherPhotoInputRef}
+                    accept="image/*"
+                    onChange={handleTeacherPhotoChange}
+                    className="hidden"
+                  />
+
+                  <div className="mt-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => teacherPhotoInputRef.current?.click()}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
+                    >
+                      {newTeacherForm.photo ? 'Changer la photo' : 'Ajouter une photo'}
+                    </button>
+                    <p className="text-[10px] text-slate-400">JPG, PNG ou WebP (max 5 Mo)</p>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Nom et Prénom *</label>
@@ -2097,10 +2211,10 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-200 transition-all text-sm flex items-center gap-2"
+                    className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-200 transition-all text-sm flex items-center gap-2 cursor-pointer"
                   >
                     <Plus size={16} strokeWidth={2.5} />
-                    <span>Enregistrer</span>
+                    <span>Créer la carte</span>
                   </button>
                 </div>
               </form>

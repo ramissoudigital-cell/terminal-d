@@ -665,31 +665,48 @@ const App: React.FC = () => {
       await saveRealtimeDocument('students', String(newStudent.id), newStudent);
 
       // Pre-register student and parent in Firestore whitelist
-      const fullName = `${newStudent.firstName || ''} ${newStudent.lastName || newStudent.name || ''}`.trim();
-      const [firstName, ...lastParts] = fullName.split(' ');
-      const lastName = lastParts.join(' ') || firstName;
+      const fullName = (newStudent.name || `${newStudent.firstName || ''} ${newStudent.lastName || ''}`).trim();
+      const firstName = newStudent.firstName || fullName.split(' ')[0] || '';
+      const lastName = newStudent.lastName || fullName.split(' ').slice(1).join(' ') || firstName;
+      const studentMatricule = newStudent.matricule || newStudent.studentId;
 
-      if (newStudent.matricule) {
-        // Pre-register Student
+      if (studentMatricule) {
+        // Pre-register Student with full profile info for instant account linking
         await preRegisterUserByAdmin({
-          matricule: newStudent.matricule,
+          id: `pre-student-${newStudent.id}`,
+          studentDocId: String(newStudent.id),
+          matricule: studentMatricule,
+          studentId: studentMatricule,
+          name: fullName,
           firstName,
           lastName,
           role: 'student',
           assignedClass: newStudent.class,
-          phone: newStudent.phone
-        });
+          phone: newStudent.studentPhone || newStudent.phone || '',
+          birthDate: newStudent.birthDate,
+          birthPlace: newStudent.birthPlace,
+          gender: newStudent.gender,
+          photo: newStudent.photoUrl,
+          assignedStatus: newStudent.assignedStatus,
+          isAccountCreated: false
+        }).catch(err => console.warn("Error pre-registering student whitelist:", err));
 
         // Pre-register Parent
-        if (newStudent.parentPhone || newStudent.parentContact) {
+        const parentTel = newStudent.parentPhone || newStudent.parentContact || newStudent.fatherPhone || newStudent.motherPhone || newStudent.tutorPhone;
+        if (parentTel) {
           await preRegisterUserByAdmin({
-            matricule: `P-${newStudent.matricule}`,
-            phone: newStudent.parentPhone || newStudent.parentContact,
+            id: `pre-parent-${newStudent.id}`,
+            studentDocId: String(newStudent.id),
+            matricule: `P-${studentMatricule}`,
+            studentId: studentMatricule,
+            phone: parentTel,
+            name: `Parent de ${fullName}`,
             firstName: `Parent de`,
             lastName: fullName,
             role: 'parent',
-            assignedClass: newStudent.class
-          });
+            assignedClass: newStudent.class,
+            isAccountCreated: false
+          }).catch(err => console.warn("Error pre-registering parent whitelist:", err));
         }
       }
   };
@@ -996,19 +1013,48 @@ const App: React.FC = () => {
       localStorage.setItem('school_user_session', JSON.stringify(user));
       localStorage.setItem('school_user', JSON.stringify(user));
       
-      // Auto-create student record if they are a student/parent and don't exist yet
-      if (user.role === 'student' || user.role === 'parent') {
+      // Auto-link or create student record if they are a student
+      if (user.role === 'student') {
           setStudents(prev => {
-              const exists = prev.find(s => s.studentId === user.matricule || s.name.toLowerCase() === user.name.toLowerCase());
-              if (exists) return prev;
+              const uMat = (user.matricule || '').toLowerCase().trim();
+              const cleanUMat = uMat.replace(/[^a-z0-9]/g, '');
+              const uName = (user.name || '').toLowerCase().trim();
+              const uId = String(user.id || '');
+
+              const existsIdx = prev.findIndex(s => {
+                const sMat = (s.studentId || s.matricule || '').toLowerCase().trim();
+                const cleanSMat = sMat.replace(/[^a-z0-9]/g, '');
+                return (
+                  String(s.id) === uId ||
+                  (s as any).authUid === uId ||
+                  (uMat && sMat && (sMat === uMat || (cleanUMat.length >= 3 && cleanSMat === cleanUMat))) ||
+                  (uName && s.name && s.name.toLowerCase().trim() === uName)
+                );
+              });
+
+              if (existsIdx >= 0) {
+                // Link authUid and keep all existing pre-registered student data (grades, evaluations, notes) intact!
+                const existing = prev[existsIdx];
+                const updatedStudent: Student = {
+                  ...existing,
+                  authUid: user.id ? String(user.id) : existing.authUid,
+                  accountCreated: true,
+                  isAccountCreated: true
+                };
+                saveRealtimeDocument('students', String(existing.id), updatedStudent).catch(() => {});
+                const nextList = [...prev];
+                nextList[existsIdx] = updatedStudent;
+                return nextList;
+              }
               
-              // Create a fresh student record based on user registration info
+              // Only create a fresh student record if student was never pre-registered
               const newStudent: Student = {
                   id: `student-${Date.now()}`,
                   name: user.name,
-                  class: user.assignedClass || 'Non Assigné',
+                  class: user.assignedClass || 'Terminale D1',
                   photoUrl: user.photo || `https://i.pravatar.cc/150?u=${Date.now()}`,
                   studentId: user.matricule || `STU-${Math.floor(1000 + Math.random() * 9000)}`,
+                  matricule: user.matricule,
                   parentPhone: user.parentPhone || '',
                   birthDate: user.birthDate || '',
                   absences: 0,
@@ -1028,6 +1074,7 @@ const App: React.FC = () => {
                   ],
                   activities: []
               };
+              saveRealtimeDocument('students', String(newStudent.id), newStudent).catch(() => {});
               return [newStudent, ...prev];
           });
       }

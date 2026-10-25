@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, User, Users, Shield, ShieldCheck, GraduationCap, Coins, Crown, BookOpen, Hash, Calendar, FileCheck, Phone, ChevronDown, Camera, AlertCircle, Loader2, Trash2, Check, Sparkles } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, User, Users, Shield, ShieldCheck, GraduationCap, Coins, Crown, BookOpen, Hash, Calendar, FileCheck, Phone, ChevronDown, Camera, AlertCircle, Loader2, Trash2, Check, Sparkles, CheckCircle, Fingerprint, Delete } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User as UserType, UserRole } from '../types';
-import { registerUserAccount, loginUserAccount } from '../src/services/firebaseService';
+import { registerUserAccount, loginUserAccount, lookupPreRegisteredStudent } from '../src/services/firebaseService';
 import { compressImage } from '../src/utils/userUtils';
+import { verifyBiometricIdentity } from '../src/utils/biometricUtils';
 import { 
   ALL_TEACHING_SUBJECTS, 
   verifySubjectAccreditation, 
@@ -273,6 +274,105 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       assignedClasses: ""
   });
 
+  const [matchedPreStudent, setMatchedPreStudent] = useState<any>(null);
+  const [studentPhotoPreview, setStudentPhotoPreview] = useState<string | null>(null);
+  const [isCheckingMatricule, setIsCheckingMatricule] = useState(false);
+
+  // Post-Registration Lock & Biometric Setup Modal States
+  const [showPostRegisterLockModal, setShowPostRegisterLockModal] = useState(false);
+  const [pendingUserToLogin, setPendingUserToLogin] = useState<any>(null);
+  const [setupPin, setSetupPin] = useState('');
+  const [setupBiometric, setSetupBiometric] = useState(true);
+  const [setupPinErrorShake, setSetupPinErrorShake] = useState(false);
+  const [setupPinErrorMsg, setSetupPinErrorMsg] = useState('');
+
+  const handleSetupPinNum = (digit: string) => {
+    if (setupPin.length < 4) {
+      setSetupPin(prev => prev + digit);
+    }
+  };
+
+  const handleSetupPinBackspace = () => {
+    setSetupPin(prev => prev.slice(0, -1));
+  };
+
+  const handleConfirmPostRegisterLock = async () => {
+    if (setupPin.length !== 4) {
+      setSetupPinErrorShake(true);
+      setSetupPinErrorMsg("Veuillez saisir un code PIN complet à 4 chiffres.");
+      setTimeout(() => setSetupPinErrorShake(false), 500);
+      return;
+    }
+
+    try {
+      localStorage.setItem('app_pin', setupPin);
+      localStorage.setItem('biometric_enabled', setupBiometric ? 'true' : 'false');
+      
+      if (setupBiometric) {
+        try {
+          await verifyBiometricIdentity({
+            reason: "Activez votre biométrie pour sécuriser votre compte",
+            title: "Biométrie activée",
+            subtitle: "Sécurité de l'application",
+            description: ""
+          });
+        } catch {}
+      }
+    } catch (e) {
+      console.warn("Error saving post-register PIN:", e);
+    }
+
+    setShowPostRegisterLockModal(false);
+    if (pendingUserToLogin) {
+      onLogin(pendingUserToLogin);
+    }
+  };
+
+  const handleSkipPostRegisterLock = () => {
+    setShowPostRegisterLockModal(false);
+    if (pendingUserToLogin) {
+      onLogin(pendingUserToLogin);
+    }
+  };
+
+  // Ensure student level is always in login mode (no registration for students)
+  useEffect(() => {
+    if (activeLevel === "Niveau 1" && !isLogin) {
+      setIsLogin(true);
+    }
+  }, [activeLevel, isLogin]);
+
+  // Live lookup to immediately detect student profile by matricule
+  useEffect(() => {
+    if (activeLevel !== "Niveau 1") {
+      setMatchedPreStudent(null);
+      return;
+    }
+    const clean = formData.matricule.trim();
+    if (clean.length < 2) {
+      setMatchedPreStudent(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsCheckingMatricule(true);
+      try {
+        const found = await lookupPreRegisteredStudent(clean);
+        if (found) {
+          setMatchedPreStudent(found);
+        } else {
+          setMatchedPreStudent(null);
+        }
+      } catch (e) {
+        setMatchedPreStudent(null);
+      } finally {
+        setIsCheckingMatricule(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [formData.matricule, activeLevel]);
+
   const updateForm = (field: string, value: string) => {
       setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -284,6 +384,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     setAuthError("");
     setShowAccreditationPassword(false);
     if (level === "Niveau 1") {
+        setIsLogin(true);
         setActiveLevel(level);
     } else {
         setIsAccreditationModalOpen(true);
@@ -369,7 +470,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       setIsLoading(true);
       
       let levelNumber = 1;
-      let role: UserRole = 'student';
+      let role: any = 'student';
       
       switch(activeLevel) {
           case "Niveau 1": 
@@ -418,9 +519,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
             onLogin({ ...loggedInUser, section: userSection });
           } else {
-            const identifier = formData.email || formData.matricule || formData.phoneTeacher || formData.phoneEleve || formData.phoneParent;
+            const identifier = activeLevel === "Niveau 1" 
+              ? formData.matricule.trim() 
+              : (formData.email || formData.matricule || formData.phoneTeacher || formData.phoneEleve || formData.phoneParent);
             if (!identifier) {
-              setAuthError("Veuillez saisir votre identifiant (Email, Matricule ou Téléphone).");
+              setAuthError(activeLevel === "Niveau 1" ? "Veuillez saisir votre matricule d'élève." : "Veuillez saisir votre identifiant (Email, Matricule ou Téléphone).");
               setIsLoading(false);
               return;
             }
@@ -436,11 +539,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             const userAccCode = loggedInUser.accreditationCode || 
               (activeLevel === 'Niveau 5' ? getTeacherIndividualAccreditationCode({ id: loggedInUser.id, subject: userSub, email: loggedInUser.email }) : undefined);
 
-            onLogin({ 
+            const finalLoggedInUser = { 
               ...loggedInUser, 
               section: userSection,
-              ...(activeLevel === 'Niveau 5' ? { subject: userSub, accreditationCode: userAccCode } : {})
-            });
+              ...(activeLevel === 'Niveau 5' ? { subject: userSub, accreditationCode: userAccCode } : {}),
+              ...(studentPhotoPreview ? { photo: studentPhotoPreview, photoUrl: studentPhotoPreview } : {})
+            };
+            if (studentPhotoPreview && (activeLevel === 'Niveau 1' || loggedInUser.role === 'student')) {
+              try {
+                const saved = localStorage.getItem('school_db_students');
+                if (saved) {
+                  const list = JSON.parse(saved);
+                  const updated = list.map((st: any) => {
+                    if (st.studentId === loggedInUser.matricule || st.matricule === loggedInUser.matricule || String(st.id) === String(loggedInUser.id)) {
+                      return { ...st, photoUrl: studentPhotoPreview, photo: studentPhotoPreview };
+                    }
+                    return st;
+                  });
+                  localStorage.setItem('school_db_students', JSON.stringify(updated));
+                }
+              } catch (e) {}
+            }
+            onLogin(finalLoggedInUser);
           }
         } else {
           // Direct Registration (Free inscription without pre-registration requirement)
@@ -496,7 +616,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             );
           }
 
-          onLogin({ 
+          const finalUserToLogin = { 
             ...registeredUser, 
             role: role,
             section: userSection,
@@ -507,7 +627,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               isProfesseurPrincipal: isTeacherPrincipal,
               principalClasses: isTeacherPrincipal ? [teacherPrincipalClass || 'Terminale D'] : []
             } : {})
-          });
+          };
+
+          // Trigger security lock & biometrics setup modal
+          setPendingUserToLogin(finalUserToLogin);
+          setSetupPin('');
+          setShowPostRegisterLockModal(true);
         }
       } catch (err: any) {
         setAuthError(err.message || "Une erreur est survenue lors de l'authentification.");
@@ -586,22 +711,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         {/* Right Panel - Form */}
         <div className="w-full md:flex-1 rounded-t-[32px] md:rounded-[36px] bg-white p-6 md:p-14 flex flex-col justify-between relative overflow-y-auto min-h-screen md:min-h-0 shrink-0 shadow-[0_-8px_30px_rgba(0,0,0,0.04)] md:shadow-none">
           
-          {/* Top Right Toggle Link */}
-          <div className="flex justify-end w-full">
-            <p className="text-[13px] text-black/60">
-              {isLogin ? "Vous n'avez pas de compte ?" : "Vous avez déjà un compte ?"} {' '}
-              <button 
-                onClick={() => { setIsLogin(!isLogin); setFormData({matricule: "", firstName: "", lastName: "", phoneParent: "", phoneEleve: "", email: "", password: "", assignedClasses: ""}); }} 
-                className="text-black font-semibold hover:underline"
-              >
-                {isLogin ? "S'inscrire" : "Se connecter"}
-              </button>
-            </p>
-          </div>
+          {/* Top Right Toggle Link - Only visible for teachers/staff, strictly removed for students */}
+          {activeLevel !== "Niveau 1" && (
+            <div className="flex justify-end w-full">
+              <p className="text-[13px] text-black/60">
+                {isLogin ? "Vous n'avez pas de compte ?" : "Vous avez déjà un compte ?"} {' '}
+                <button 
+                  onClick={() => { setIsLogin(!isLogin); setFormData({matricule: "", firstName: "", lastName: "", phoneParent: "", phoneEleve: "", email: "", password: "", assignedClasses: ""}); }} 
+                  className="text-black font-semibold hover:underline"
+                >
+                  {isLogin ? "S'inscrire" : "Se connecter"}
+                </button>
+              </p>
+            </div>
+          )}
 
           <div className="max-w-[420px] mx-auto w-full flex-1 flex flex-col justify-center mt-6 md:mt-0">
             <div className="flex items-center gap-3 mb-2.5">
-              {!isLogin && (
+              {activeLevel !== "Niveau 1" && !isLogin && (
                 <button
                   type="button"
                   onClick={() => { setIsLogin(true); setAuthError(""); setAuthErrorCode(null); }}
@@ -612,11 +739,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 </button>
               )}
               <h1 className="text-[32px] md:text-[50px] font-medium tracking-tight leading-tight text-black transition-all">
-                {isLogin ? "Bon retour" : "Créer un compte"}
+                {activeLevel === "Niveau 1" ? "Espace Élève" : (isLogin ? "Bon retour" : "Créer un compte")}
               </h1>
             </div>
             <p className="text-[14px] md:text-[15px] text-black/60 leading-relaxed mb-6 transition-all">
-              {isLogin ? (
+              {activeLevel === "Niveau 1" ? (
+                <>Connectez-vous avec votre matricule et votre mot de passe pour accéder à vos notes et bulletins.</>
+              ) : isLogin ? (
                 <>Connectez-vous pour accéder à votre <br className="hidden md:block" /> espace numérique</>
               ) : (
                 <>Inscrivez-vous pour rejoindre l'espace <br className="hidden md:block" /> numérique du collège</>
@@ -637,7 +766,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                     <div className="flex-1 font-medium">{authError}</div>
                   </div>
                   
-                  {(authErrorCode === 'ACCOUNT_NOT_FOUND' || authError.includes('inscrire') || authError.includes('Aucun compte')) && isLogin && (
+                  {activeLevel !== "Niveau 1" && (authErrorCode === 'ACCOUNT_NOT_FOUND' || authError.includes('inscrire') || authError.includes('Aucun compte')) && isLogin && (
                     <div className="pt-2 border-t border-red-200/60 flex items-center justify-between gap-3 flex-wrap">
                       <span className="text-xs text-red-700 font-normal">Vous n'avez pas encore de compte ?</span>
                       <button
@@ -662,98 +791,104 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
               <AnimatePresence mode="wait">
               {activeLevel === "Niveau 1" ? (
-                !isLogin ? (
-                  
-                  <motion.div 
-                    key="eleve"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex flex-col gap-4 "
-                  >
-                    <h3 className="text-[13px] font-bold text-black uppercase tracking-wider mt-1">Informations Élève</h3>
-                    
-                    <div className="flex flex-col gap-4">
-                      <div className="relative">
-                        <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-black/40"><Hash className="w-[16px] h-[16px]" strokeWidth={1.5} /></div>
-                        <input required type="text" value={formData.matricule} onChange={e=>updateForm('matricule', e.target.value)} placeholder="Matricule (Ex: 2024-2543)" className="w-full bg-transparent border border-black/10 rounded-[20px] py-[17px] pl-[46px] pr-4 text-[14px] text-black placeholder:text-black/50 focus:outline-none focus:border-black/30 transition-colors" />
+                /* Élève : Uniquement la section Connexion par Matricule + Mot de passe */
+                <motion.div 
+                  key="login-eleve"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col gap-3.5"
+                >
+                  <div className="p-3.5 bg-sky-50 border border-sky-100 rounded-[20px] text-[12px] text-sky-800 flex items-start gap-2.5 shadow-xs">
+                    <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                    <div className="leading-relaxed">
+                      Votre dossier a été enregistré par l'école. Saisissez votre <strong>matricule</strong> pour vous identifier directement.
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-black/40">
+                      <Hash className="w-[16px] h-[16px]" strokeWidth={1.5} />
+                    </div>
+                    <input 
+                      required
+                      type="text" 
+                      value={formData.matricule} onChange={e=>updateForm('matricule', e.target.value)}
+                      placeholder="Matricule de l'élève (Ex: 2024-2543)" 
+                      className="w-full bg-transparent border border-black/10 rounded-[20px] py-[17px] pl-[46px] pr-4 text-[14px] font-medium text-black placeholder:text-black/50 focus:outline-none focus:border-black/30 transition-colors"
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Instant recognition badge if matricule exists in system */}
+                  {matchedPreStudent && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-3 bg-emerald-50 border border-emerald-200 rounded-[18px] flex items-center gap-2.5 text-[12px] text-emerald-800 shadow-sm"
+                    >
+                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div className="flex-1 leading-snug">
+                        <span className="font-bold">Élève reconnu : </span>
+                        <span className="font-semibold text-emerald-950">{matchedPreStudent.name}</span>
+                        <span className="text-emerald-700 ml-1.5 text-[11px]">({matchedPreStudent.assignedClass || 'Terminale D1'})</span>
                       </div>
-                      
-                      <div className="relative">
-                        <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-black/40"><User className="w-[16px] h-[16px]" strokeWidth={1.5} /></div>
-                        <input required type="text" value={formData.lastName} onChange={e=>updateForm('lastName', e.target.value)} placeholder="Nom" className="w-full bg-transparent border border-black/10 rounded-[20px] py-[17px] pl-[46px] pr-4 text-[14px] text-black placeholder:text-black/50 focus:outline-none focus:border-black/30 transition-colors" />
-                      </div>
-                      
-                      <div className="relative">
-                        <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-black/40"><User className="w-[16px] h-[16px]" strokeWidth={1.5} /></div>
-                        <input required type="text" value={formData.firstName} onChange={e=>updateForm('firstName', e.target.value)} placeholder="Prénom" className="w-full bg-transparent border border-black/10 rounded-[20px] py-[17px] pl-[46px] pr-4 text-[14px] text-black placeholder:text-black/50 focus:outline-none focus:border-black/30 transition-colors" />
-                      </div>
-                      
-                      {/* Classe fixée à Terminale D1 (Tle D1) */}
-                      <div className="relative">
-                        <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-black/40 z-10 pointer-events-none">
-                          <BookOpen className="w-[16px] h-[16px]" strokeWidth={1.5} />
-                        </div>
-                        <div 
-                          className="w-full bg-black/[0.03] border border-black/10 rounded-[20px] py-[17px] pl-[46px] pr-4 text-[14px] font-semibold text-black flex items-center justify-between"
+                    </motion.div>
+                  )}
+
+                  <div className="relative">
+                    <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-black/40">
+                      <Lock className="w-[16px] h-[16px]" strokeWidth={1.5} />
+                    </div>
+                    <input 
+                      required
+                      type="password" 
+                      value={formData.password} onChange={e=>updateForm('password', e.target.value)}
+                      placeholder="Mot de passe" 
+                      className="w-full bg-transparent border border-black/10 rounded-[20px] py-[17px] pl-[46px] pr-12 text-[14px] text-black placeholder:text-black/50 focus:outline-none focus:border-black/30 transition-colors"
+                    />
+                  </div>
+
+                  {/* Photo capture / upload button for student */}
+                  <div className="pt-1">
+                    <input 
+                      type="file" 
+                      id="student-login-photo-input"
+                      accept="image/*" 
+                      capture="environment"
+                      className="hidden" 
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const dataUrl = await compressImage(file, 400, 400, 0.85);
+                            setStudentPhotoPreview(dataUrl);
+                          } catch (err) {}
+                        }
+                      }}
+                    />
+                    <label 
+                      htmlFor="student-login-photo-input"
+                      className="w-full py-3 px-4 bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs rounded-[18px] flex items-center justify-center gap-2 cursor-pointer transition-all border border-sky-200 shadow-2xs"
+                    >
+                      <Camera size={16} className="text-sky-600" />
+                      <span>{studentPhotoPreview ? "Photo de profil capturée ✓" : "Prendre / Importer ma photo d'élève"}</span>
+                    </label>
+                    {studentPhotoPreview && (
+                      <div className="mt-2 flex items-center justify-center gap-2">
+                        <img src={studentPhotoPreview} alt="Aperçu" className="w-12 h-12 rounded-xl object-cover border-2 border-sky-500 shadow-sm" />
+                        <button
+                          type="button"
+                          onClick={() => setStudentPhotoPreview(null)}
+                          className="text-[11px] text-rose-600 font-bold hover:underline"
                         >
-                          <span>Classe : Terminale D1 (Tle D1)</span>
-                          <span className="text-[11px] font-bold uppercase tracking-wider bg-sky-100 text-sky-800 px-2.5 py-1 rounded-full border border-sky-200">
-                            Classe unique
-                          </span>
-                        </div>
+                          Supprimer
+                        </button>
                       </div>
-                      
-                      <div className="relative">
-                        <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-black/40"><Lock className="w-[16px] h-[16px]" strokeWidth={1.5} /></div>
-                        <input type="password" value={formData.password} onChange={e=>updateForm('password', e.target.value)} placeholder="Mot de passe (Optionnel, min. 6 caractères)" className="w-full bg-transparent border border-black/10 rounded-[20px] py-[17px] pl-[46px] pr-4 text-[14px] text-black placeholder:text-black/50 focus:outline-none focus:border-black/30 transition-colors" />
-                      </div>
-
-                      <div className="relative">
-                        <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-black/40"><Phone className="w-[16px] h-[16px]" strokeWidth={1.5} /></div>
-                        <input type="tel" value={formData.phoneEleve} onChange={e=>updateForm('phoneEleve', e.target.value)} placeholder="Tél. Élève (+225... - Optionnel)" className="w-full bg-transparent border border-black/10 rounded-[20px] py-[17px] pl-[46px] pr-4 text-[14px] text-black placeholder:text-black/50 focus:outline-none focus:border-black/30 transition-colors" />
-                      </div>
-                    </div>
-
-                    <ProfilePhotoUploader photo={profilePhoto} onPhotoChange={setProfilePhoto} />
-                  </motion.div>
-                  
-                ) : (
-                  <motion.div 
-                    key="login-eleve"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex flex-col gap-3"
-                  >
-                    <div className="relative">
-                      <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-black/40">
-                        <Hash className="w-[16px] h-[16px]" strokeWidth={1.5} />
-                      </div>
-                      <input 
-                        required
-                        type="text" 
-                        value={formData.matricule} onChange={e=>updateForm('matricule', e.target.value)}
-                        placeholder="Matricule de l'élève (Ex: 2024-2543)" 
-                        className="w-full bg-transparent border border-black/10 rounded-[20px] py-[17px] pl-[46px] pr-4 text-[14px] text-black placeholder:text-black/50 focus:outline-none focus:border-black/30 transition-colors"
-                      />
-                    </div>
-                    <div className="relative">
-                      <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-black/40">
-                        <Lock className="w-[16px] h-[16px]" strokeWidth={1.5} />
-                      </div>
-                      <input 
-                        required
-                        type="password" 
-                        value={formData.password} onChange={e=>updateForm('password', e.target.value)}
-                        placeholder="Mot de passe" 
-                        className="w-full bg-transparent border border-black/10 rounded-[20px] py-[17px] pl-[46px] pr-12 text-[14px] text-black placeholder:text-black/50 focus:outline-none focus:border-black/30 transition-colors"
-                      />
-                    </div>
-                  </motion.div>
-                )
+                    )}
+                  </div>
+                </motion.div>
               ) : activeLevel === "Niveau 5" ? (
                 !isLogin ? (
                   <motion.div 
@@ -981,7 +1116,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                   </>
                 ) : (
                   <>
-                    {isLogin ? "Se connecter" : "S'inscrire"} 
+                    {activeLevel === "Niveau 1" || isLogin ? "Se connecter" : "S'inscrire"} 
                     <ArrowRight className="w-[18px] h-[18px] text-white/70 group-hover:text-white transition-colors" strokeWidth={1.5} />
                   </>
                 )}
@@ -1175,6 +1310,153 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                   className="flex-1 py-[14px] rounded-[18px] text-[14px] font-bold text-white bg-slate-900 hover:bg-black transition-all shadow-md active:scale-[0.98] cursor-pointer"
                 >
                   Valider l'accès
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Post-Registration Lock & Biometrics Setup Modal */}
+        {showPostRegisterLockModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="bg-white rounded-[32px] p-6 sm:p-8 max-w-[420px] w-full shadow-2xl border border-slate-100 text-center relative overflow-hidden my-auto"
+            >
+              {/* Header Icon */}
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center mx-auto mb-4 shadow-lg shadow-sky-500/25 ring-4 ring-sky-50">
+                <ShieldCheck size={32} />
+              </div>
+
+              <h3 className="text-xl font-black text-slate-900 mb-1 tracking-tight">
+                Sécurisez votre application
+              </h3>
+              <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+                Félicitations pour votre inscription ! Pour protéger vos données scolaires et l'accès à la section Sécurité, configurez votre <strong>code PIN secret à 4 chiffres</strong> et activez la <strong>biométrie</strong>.
+              </p>
+
+              {setupPinErrorMsg && (
+                <div className="mb-4 p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center justify-center gap-1.5">
+                  <AlertCircle size={15} className="shrink-0" />
+                  <span>{setupPinErrorMsg}</span>
+                </div>
+              )}
+
+              {/* PIN Code Dots Display */}
+              <div className={`flex justify-center items-center gap-4 mb-5 ${setupPinErrorShake ? 'animate-bounce' : ''}`}>
+                {[0, 1, 2, 3].map((idx) => {
+                  const isFilled = setupPin.length > idx;
+                  return (
+                    <div
+                      key={idx}
+                      className={`w-4 h-4 rounded-full transition-all duration-200 ${
+                        isFilled
+                          ? 'bg-sky-600 scale-125 shadow-md shadow-sky-500/40 ring-4 ring-sky-100'
+                          : 'bg-slate-200 border-2 border-slate-300'
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Numeric Keypad */}
+              <div className="grid grid-cols-3 gap-2.5 max-w-[260px] mx-auto mb-5">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => {
+                      setSetupPinErrorMsg('');
+                      handleSetupPinNum(num);
+                    }}
+                    className="h-12 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-800 text-lg font-bold border border-slate-200/80 shadow-2xs transition-all flex items-center justify-center cursor-pointer"
+                  >
+                    {num}
+                  </button>
+                ))}
+                <div className="flex items-center justify-center">
+                  {setupPin.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSetupPin('');
+                        setSetupPinErrorMsg('');
+                      }}
+                      className="text-[11px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      Effacer
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSetupPinErrorMsg('');
+                    handleSetupPinNum('0');
+                  }}
+                  className="h-12 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-800 text-lg font-bold border border-slate-200/80 shadow-2xs transition-all flex items-center justify-center cursor-pointer"
+                >
+                  0
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSetupPinBackspace}
+                  className="h-12 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-600 border border-slate-200/80 shadow-2xs transition-all flex items-center justify-center cursor-pointer"
+                >
+                  <Delete size={20} />
+                </button>
+              </div>
+
+              {/* Biometrics Toggle Option */}
+              <div 
+                onClick={() => setSetupBiometric(!setupBiometric)}
+                className={`p-3 rounded-2xl border transition-all mb-5 flex items-center justify-between cursor-pointer text-left ${
+                  setupBiometric 
+                    ? 'bg-sky-50/80 border-sky-300 ring-2 ring-sky-500/10' 
+                    : 'bg-slate-50 border-slate-200 opacity-80'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                    setupBiometric ? 'bg-sky-600 text-white shadow-sm' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    <Fingerprint size={20} />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-slate-900 leading-tight">Activer la Biométrie</h5>
+                    <p className="text-[10px] text-slate-500">Empreinte digitale / Face ID</p>
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors ${
+                  setupBiometric ? 'bg-sky-600 text-white' : 'border border-slate-300 bg-white'
+                }`}>
+                  {setupBiometric && <Check size={14} strokeWidth={3} />}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <button 
+                  type="button"
+                  onClick={handleConfirmPostRegisterLock}
+                  className="w-full py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 transition-all shadow-md shadow-sky-600/20 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <ShieldCheck size={18} />
+                  <span>Activer le verrouillage & Continuer</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleSkipPostRegisterLock}
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                >
+                  Passer pour l'instant
                 </button>
               </div>
             </motion.div>

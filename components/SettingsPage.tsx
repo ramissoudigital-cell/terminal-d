@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Save, User, Bell, Lock, Camera, CheckCircle, Shield, Smartphone, Mail, Eye, EyeOff, LogOut, Info, Sparkles, GraduationCap, ShieldCheck, Heart, HelpCircle, Globe, Code, CheckCircle2, Zap, Loader2, Trash2, ArrowLeft, BookOpen, KeyRound, RotateCcw, Search, Copy, Check, Palette, Moon, Sun } from 'lucide-react';
+import { Save, User, Bell, Lock, Camera, CheckCircle, Shield, Smartphone, Mail, Eye, EyeOff, LogOut, Info, Sparkles, GraduationCap, ShieldCheck, Heart, HelpCircle, Globe, Code, CheckCircle2, Zap, Loader2, Trash2, ArrowLeft, BookOpen, KeyRound, RotateCcw, Search, Copy, Check, Palette, Moon, Sun, PenLine, Fingerprint, Delete } from 'lucide-react';
 import { User as UserType } from '../types';
 import { compressImage, getDefaultAvatar, getRoleLabel } from '../src/utils/userUtils';
 import { BilanFinAnnee } from "./BilanFinAnnee";
 import { useNotifications } from '../src/hooks/useNotifications';
 import { PasswordView } from './PasswordView';
+import { verifyBiometricIdentity } from '../src/utils/biometricUtils';
 import { 
   ALL_TEACHING_SUBJECTS, 
   getSubjectAccreditationCode, 
@@ -344,6 +345,150 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
     };
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showRegistrationPassword, setShowRegistrationPassword] = useState(false);
+
+  // Security section unlock & password edit states
+  const [isSecurityUnlocked, setIsSecurityUnlocked] = useState(false);
+  const [securityPinInput, setSecurityPinInput] = useState('');
+  const [securityPinShake, setSecurityPinShake] = useState(false);
+  const [securityPinErrorMsg, setSecurityPinErrorMsg] = useState('');
+
+  const [isEditingRegPassword, setIsEditingRegPassword] = useState(false);
+  const [newRegPasswordVal, setNewRegPasswordVal] = useState('');
+  const [isSavingRegPassword, setIsSavingRegPassword] = useState(false);
+
+  const handleVerifySecurityBiometric = async () => {
+    try {
+      const ok = await verifyBiometricIdentity({
+        reason: "Déverrouillez pour accéder à la section Sécurité",
+        title: "Sécurité",
+        subtitle: "Confirmez votre identité",
+        description: ""
+      });
+      if (ok) {
+        setIsSecurityUnlocked(true);
+      }
+    } catch {}
+  };
+
+  const handleSecurityPinNum = (digit: string) => {
+    if (securityPinInput.length < 4) {
+      const nextPin = securityPinInput + digit;
+      setSecurityPinInput(nextPin);
+      if (nextPin.length === 4) {
+        const saved = localStorage.getItem('app_pin');
+        if (nextPin === saved) {
+          setIsSecurityUnlocked(true);
+          setSecurityPinInput('');
+          setSecurityPinErrorMsg('');
+        } else {
+          setSecurityPinShake(true);
+          setSecurityPinErrorMsg('Code PIN incorrect');
+          setTimeout(() => {
+            setSecurityPinShake(false);
+            setSecurityPinInput('');
+          }, 600);
+        }
+      }
+    }
+  };
+
+  const handleSecurityPinBackspace = () => {
+    setSecurityPinInput(prev => prev.slice(0, -1));
+  };
+
+  useEffect(() => {
+    if (activeTab === 'security' && !isSecurityUnlocked) {
+      const savedPin = localStorage.getItem('app_pin');
+      const bioEnabled = localStorage.getItem('biometric_enabled') === 'true';
+      if (savedPin && bioEnabled) {
+        handleVerifySecurityBiometric();
+      }
+    }
+  }, [activeTab, isSecurityUnlocked]);
+
+  const handleUpdateRegistrationPassword = async () => {
+    const trimmed = newRegPasswordVal.trim();
+    if (!trimmed || trimmed.length < 4) {
+      alert("Le mot de passe doit comporter au moins 4 caractères.");
+      return;
+    }
+
+    setIsSavingRegPassword(true);
+    try {
+      if (currentUser && onUpdateUser) {
+        const updated = { ...currentUser, password: trimmed, pinCode: trimmed };
+        onUpdateUser(updated);
+      }
+
+      // Sync in school_db_users
+      try {
+        const dbUsers = JSON.parse(localStorage.getItem('school_db_users') || '[]');
+        const updatedDb = dbUsers.map((u: any) => {
+          if (u.id === currentUser?.id || (u.email && u.email === currentUser?.email) || (u.matricule && u.matricule === currentUser?.matricule)) {
+            return { ...u, password: trimmed, pinCode: trimmed };
+          }
+          return u;
+        });
+        localStorage.setItem('school_db_users', JSON.stringify(updatedDb));
+      } catch (e) {}
+
+      // Sync in school_registered_users
+      try {
+        const regUsers = JSON.parse(localStorage.getItem('school_registered_users') || '[]');
+        const updatedReg = regUsers.map((u: any) => {
+          if (u.id === currentUser?.id || (u.email && u.email === currentUser?.email) || (u.matricule && u.matricule === currentUser?.matricule)) {
+            return { ...u, password: trimmed, pinCode: trimmed };
+          }
+          return u;
+        });
+        localStorage.setItem('school_registered_users', JSON.stringify(updatedReg));
+      } catch (e) {}
+
+      // Sync in school_user_session
+      try {
+        const sess = localStorage.getItem('school_user_session');
+        if (sess) {
+          const parsed = JSON.parse(sess);
+          localStorage.setItem('school_user_session', JSON.stringify({
+            ...parsed,
+            password: trimmed,
+            pinCode: trimmed
+          }));
+        }
+      } catch (e) {}
+
+      // Sync in school_user
+      try {
+        const sUser = localStorage.getItem('school_user');
+        if (sUser) {
+          const parsed = JSON.parse(sUser);
+          localStorage.setItem('school_user', JSON.stringify({
+            ...parsed,
+            password: trimmed,
+            pinCode: trimmed
+          }));
+        }
+      } catch (e) {}
+
+      // Sync to Firestore users collection
+      try {
+        if (currentUser?.id) {
+          await saveRealtimeDocument('users', String(currentUser.id), {
+            password: trimmed,
+            pinCode: trimmed
+          });
+        }
+      } catch (e) {
+        console.warn("Sync Firestore user password error:", e);
+      }
+
+      setIsEditingRegPassword(false);
+      handleSave("Votre mot de passe d'inscription");
+    } finally {
+      setIsSavingRegPassword(false);
+    }
+  };
 
   // --- HANDLERS ---
 
@@ -650,11 +795,181 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
             </div>
         );
 
-      case 'security':
+      case 'security': {
+        const savedAppPin = localStorage.getItem('app_pin');
+        if (savedAppPin && !isSecurityUnlocked) {
+          const hasBio = localStorage.getItem('biometric_enabled') === 'true';
+          return (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300 max-w-md mx-auto py-8 flex flex-col items-center">
+              <div className="w-16 h-16 rounded-3xl bg-sky-500/10 text-sky-600 flex items-center justify-center mb-4 shadow-sm border border-sky-100">
+                <Lock size={30} />
+              </div>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight mb-2 text-center">
+                Section Sécurité Protégée
+              </h2>
+              <p className="text-xs text-slate-500 text-center mb-6 max-w-xs leading-relaxed">
+                Entrez votre code secret de verrouillage (PIN à 4 chiffres) ou utilisez votre biométrie pour accéder aux paramètres de sécurité.
+              </p>
+
+              {/* 4 PIN Dots */}
+              <div className={`flex items-center gap-4 mb-6 ${securityPinShake ? 'animate-bounce' : ''}`}>
+                {[0, 1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className={`w-4 h-4 rounded-full border-2 transition-all duration-200 ${
+                      securityPinInput.length > i 
+                        ? 'bg-sky-500 border-sky-500 scale-110 shadow-sm shadow-sky-500/50' 
+                        : 'border-slate-300 bg-white'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {securityPinErrorMsg && (
+                <p className="text-rose-500 text-xs font-bold mb-4">
+                  {securityPinErrorMsg}
+                </p>
+              )}
+
+              {/* Keypad */}
+              <div className="grid grid-cols-3 gap-3 w-full max-w-[260px] mb-6">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => handleSecurityPinNum(num.toString())}
+                    className="h-14 rounded-2xl bg-white border border-slate-200/90 text-slate-900 text-xl font-bold shadow-2xs hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer select-none"
+                  >
+                    {num}
+                  </button>
+                ))}
+                {hasBio ? (
+                  <button
+                    type="button"
+                    onClick={handleVerifySecurityBiometric}
+                    className="h-14 rounded-2xl bg-sky-50 border border-sky-200 text-sky-600 hover:bg-sky-100 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                    title="Authentification biométrique"
+                  >
+                    <Fingerprint size={24} />
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleSecurityPinNum('0')}
+                  className="h-14 rounded-2xl bg-white border border-slate-200/90 text-slate-900 text-xl font-bold shadow-2xs hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer select-none"
+                >
+                  0
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSecurityPinBackspace}
+                  className="h-14 rounded-2xl bg-white border border-slate-200/90 text-slate-600 hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  title="Effacer"
+                >
+                  <Delete size={20} />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('profile')}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              >
+                ← Retour au profil
+              </button>
+            </div>
+          );
+        }
+
         return (
             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                 <h2 className="text-xl font-bold text-gray-800 mb-6">Sécurité & Mot de passe</h2>
                 
+                {/* Section : Mot de passe de l'inscription (avec modification libre) */}
+                <div className="mb-8 p-5 bg-sky-50/70 border border-sky-100 rounded-2xl shadow-2xs">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-bold text-sky-900 uppercase tracking-wider flex items-center gap-2">
+                            <KeyRound size={16} className="text-sky-600" /> Mot de passe de votre inscription
+                        </h3>
+                        {!isEditingRegPassword && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setNewRegPasswordVal(currentUser?.password || currentUser?.pinCode || '');
+                                    setIsEditingRegPassword(true);
+                                }}
+                                className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            >
+                                <PenLine size={13} />
+                                <span>Modifier à votre guise</span>
+                            </button>
+                        )}
+                    </div>
+                    <p className="text-xs text-slate-600 mb-4">
+                        Ce mot de passe sert à vous identifier sur votre compte. Vous pouvez le consulter et le modifier librement :
+                    </p>
+
+                    {!isEditingRegPassword ? (
+                        <div className="flex items-center gap-3 bg-white p-3.5 rounded-xl border border-sky-200/80 shadow-2xs">
+                            <div className="flex-1 font-mono font-bold text-slate-800 text-sm md:text-base tracking-wider truncate">
+                                {showRegistrationPassword ? (currentUser?.password || currentUser?.pinCode || 'Non défini') : '••••••••••••'}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowRegistrationPassword(!showRegistrationPassword)}
+                                className="p-2 text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-lg transition-all cursor-pointer"
+                                title={showRegistrationPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                            >
+                                {showRegistrationPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-3 bg-white p-4 rounded-xl border border-sky-300 shadow-sm">
+                            <label className="block text-xs font-bold text-slate-700">
+                                Nouveau mot de passe personnalisé
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type={showRegistrationPassword ? "text" : "password"}
+                                    value={newRegPasswordVal}
+                                    onChange={(e) => setNewRegPasswordVal(e.target.value)}
+                                    placeholder="Entrez votre nouveau mot de passe (min. 4 car.)"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                                    autoFocus
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowRegistrationPassword(!showRegistrationPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                                >
+                                    {showRegistrationPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                            <div className="flex items-center justify-end gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditingRegPassword(false)}
+                                    disabled={isSavingRegPassword}
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleUpdateRegistrationPassword}
+                                    disabled={isSavingRegPassword || !newRegPasswordVal.trim()}
+                                    className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                    {isSavingRegPassword ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                    <span>Enregistrer le mot de passe</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 <div className="mb-8">
                     <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Changer le mot de passe</h3>
                     <div className="space-y-4">
@@ -755,6 +1070,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
                 </div>
             </div>
         );
+      }
 
       case 'app_lock':
         return (

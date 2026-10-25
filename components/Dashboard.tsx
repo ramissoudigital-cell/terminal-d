@@ -195,14 +195,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
 
   useEffect(() => {
     if (currentStudent && onUpdateStudent && !readOnly) {
-      const classNameLower = currentStudent.class.toLowerCase();
+      const classNameLower = (currentStudent?.class || '').toLowerCase();
       const isSenior = classNameLower.includes('première') || classNameLower.includes('premiere') || classNameLower.includes('terminal');
-      const hasPhilo = currentStudent.subjects.some(s => s.name.toLowerCase() === 'philosophie');
+      const studentSubjects = Array.isArray(currentStudent?.subjects) ? currentStudent.subjects : [];
+      const hasPhilo = studentSubjects.some(s => (s?.name || '').toLowerCase() === 'philosophie');
       
       if (isSenior && !hasPhilo) {
         onUpdateStudent({
           ...currentStudent,
-          subjects: [...currentStudent.subjects, { name: 'Philosophie', value: 15, average: 0, fill: '#7c3aed' }]
+          subjects: [...studentSubjects, { name: 'Philosophie', value: 15, average: 0, fill: '#7c3aed' }]
         });
       }
     }
@@ -210,7 +211,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
 
   useEffect(() => {
     if (currentStudent) {
-      const classPPInfo = getClassPrincipalTeacherSignature(currentStudent.class);
+      const studentClass = currentStudent?.class || '';
+      const classPPInfo = getClassPrincipalTeacherSignature(studentClass);
       const effectiveSig = currentStudent.teacherSignature || classPPInfo.signature;
       const effectiveName = currentStudent.mainTeacherName || classPPInfo.teacherName;
 
@@ -225,10 +227,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
       } else {
         const teachersList = JSON.parse(localStorage.getItem('school_db_teachers') || '[]');
         const classPP = teachersList.find((t: any) => 
-          t.isPrincipal && t.principalClasses && (
+          t?.isPrincipal && t?.principalClasses && (
             Array.isArray(t.principalClasses) 
-              ? t.principalClasses.some((c: string) => c.trim().toLowerCase() === currentStudent.class.trim().toLowerCase())
-              : t.principalClasses.split(',').map((s: string) => s.trim().toLowerCase()).includes(currentStudent.class.trim().toLowerCase())
+              ? t.principalClasses.some((c: string) => String(c || '').trim().toLowerCase() === studentClass.trim().toLowerCase())
+              : String(t.principalClasses || '').split(',').map((s: string) => s.trim().toLowerCase()).includes(studentClass.trim().toLowerCase())
           )
         );
         if (classPP && classPP.name) {
@@ -277,6 +279,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
 
     if (currentUser?.role === 'parent') {
       return getParentChildren(currentUser, allStudents);
+    }
+
+    const isStudentUser = currentUser?.role === 'student' || currentUser?.role === 'élève' || currentUser?.role === 'eleve' || (currentUser?.accessLevel === 1 && currentUser?.role !== 'parent');
+    if (isStudentUser) {
+      const uMat = (currentUser?.matricule || '').toString().toLowerCase().trim();
+      const cleanUMat = uMat.replace(/[^a-z0-9]/g, '');
+      const uName = (currentUser?.name || '').toLowerCase().trim();
+      const uId = String(currentUser?.id || '');
+
+      const found = allStudents.find(s => {
+        const sMat = (s.studentId || s.matricule || '').toString().toLowerCase().trim();
+        const cleanSMat = sMat.replace(/[^a-z0-9]/g, '');
+        return (
+          (uMat && sMat && (sMat === uMat || (cleanUMat.length >= 3 && cleanSMat === cleanUMat))) ||
+          String(s.id) === uId ||
+          (s as any).authUid === uId ||
+          (uName && s.name && s.name.toLowerCase().trim() === uName)
+        );
+      });
+
+      if (found) {
+        return [found];
+      }
     }
 
     const isTeacher = currentUser?.role === 'teacher' || currentUser?.role === 'professeur' || currentUser?.accessLevel === 3;
@@ -356,6 +381,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
     return allStudents;
   }, [allStudents, currentUser, isPrimaryUser]);
 
+  const [studentSortBy, setStudentSortBy] = useState<'name' | 'class' | 'average'>('name');
+
+  const sortedDisplayableStudents = useMemo(() => {
+    const list = [...displayableStudents];
+    list.sort((a, b) => {
+      if (studentSortBy === 'name') {
+        return (a.name || '').localeCompare(b.name || '');
+      } else if (studentSortBy === 'class') {
+        return (a.class || '').localeCompare(b.class || '');
+      } else if (studentSortBy === 'average') {
+        const avgA = computeStudentAverage(a);
+        const avgB = computeStudentAverage(b);
+        return avgB - avgA;
+      }
+      return 0;
+    });
+    return list;
+  }, [displayableStudents, studentSortBy]);
+
   useEffect(() => {
     if (preSelectedStudent) {
         const freshData = displayableStudents?.find(s => s.id === preSelectedStudent.id) || displayableStudents[0] || preSelectedStudent;
@@ -380,9 +424,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
   };
 
   useEffect(() => {
-    if (searchTerm.trim() === '') return;
+    if (!searchTerm || searchTerm.trim() === '') return;
     if (!displayableStudents) return;
-    const found = displayableStudents.find(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const term = searchTerm.toLowerCase();
+    const found = displayableStudents.find(s => (s?.name || '').toLowerCase().includes(term));
     if (found) {
         handleSelectStudent(found);
     }
@@ -822,8 +867,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
           average: avg
         };
       });
-      const allemand = subjects.find(s => s.name.toLowerCase().includes("allemand"));
-      const espagnol = subjects.find(s => s.name.toLowerCase().includes("espagnol"));
+      const allemand = subjects.find(s => (s?.name || '').toLowerCase().includes("allemand"));
+      const espagnol = subjects.find(s => (s?.name || '').toLowerCase().includes("espagnol"));
       if (allemand && espagnol) {
         const markAllemand = getDisciplineMarkFromStudent(currentStudent, trimKey, "Allemand");
         const markEspagnol = getDisciplineMarkFromStudent(currentStudent, trimKey, "Espagnol");
@@ -835,16 +880,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
         const hasEspagnol = hasEspagnolGrades || markEspagnol !== null;
 
         if (hasAllemand && !hasEspagnol) {
-          subjects = subjects.map(s => s.name.toLowerCase().includes("espagnol") ? { ...s, inactive: true } : s);
+          subjects = subjects.map(s => (s?.name || '').toLowerCase().includes("espagnol") ? { ...s, inactive: true } : s);
         } else if (hasEspagnol && !hasAllemand) {
-          subjects = subjects.map(s => s.name.toLowerCase().includes("allemand") ? { ...s, inactive: true } : s);
+          subjects = subjects.map(s => (s?.name || '').toLowerCase().includes("allemand") ? { ...s, inactive: true } : s);
         } else if (hasAllemand && hasEspagnol) {
           const countAll = allemand.grades?.length || 0;
           const countEsp = espagnol.grades?.length || 0;
           if (countEsp >= countAll) {
-            subjects = subjects.map(s => s.name.toLowerCase().includes("allemand") ? { ...s, inactive: true } : s);
+            subjects = subjects.map(s => (s?.name || '').toLowerCase().includes("allemand") ? { ...s, inactive: true } : s);
           } else {
-            subjects = subjects.map(s => s.name.toLowerCase().includes("espagnol") ? { ...s, inactive: true } : s);
+            subjects = subjects.map(s => (s?.name || '').toLowerCase().includes("espagnol") ? { ...s, inactive: true } : s);
           }
         }
       }
@@ -1267,7 +1312,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
         {currentUser?.role === 'parent' && displayableStudents.length > 0 && (
           <div className="mb-8 p-5 bg-gradient-to-r from-sky-900 via-indigo-900 to-slate-900 rounded-[28px] text-white shadow-xl relative overflow-hidden border border-sky-700/50">
             <div className="absolute top-0 right-0 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            <div className="flex items-center justify-between mb-4 relative z-10">
+            <div className="flex items-center justify-between mb-4 relative z-10 flex-wrap gap-3">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-sky-500/20 rounded-xl border border-sky-400/30 text-sky-300">
                   <GraduationCap className="w-5 h-5" />
@@ -1277,10 +1322,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
                   <p className="text-xs text-sky-200/80">Cliquez sur un enfant pour consulter ses notes, bulletins et suivis.</p>
                 </div>
               </div>
+
+              {displayableStudents.length > 1 && (
+                <div className="flex items-center gap-1.5 bg-white/10 p-1 rounded-xl border border-white/20 backdrop-blur-md">
+                  <span className="text-[11px] font-semibold text-sky-200 px-2">Trier par :</span>
+                  <button
+                    type="button"
+                    onClick={() => setStudentSortBy('name')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      studentSortBy === 'name' ? 'bg-sky-500 text-white shadow-sm' : 'text-sky-200 hover:text-white'
+                    }`}
+                  >
+                    Nom
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStudentSortBy('class')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      studentSortBy === 'class' ? 'bg-sky-500 text-white shadow-sm' : 'text-sky-200 hover:text-white'
+                    }`}
+                  >
+                    Classe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStudentSortBy('average')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      studentSortBy === 'average' ? 'bg-sky-500 text-white shadow-sm' : 'text-sky-200 hover:text-white'
+                    }`}
+                  >
+                    Moyenne
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 relative z-10">
-              {displayableStudents.map((childStudent) => {
+              {sortedDisplayableStudents.map((childStudent) => {
                 const isSelected = currentStudent?.id === childStudent.id || currentStudent?.studentId === childStudent.studentId;
                 const isPrim = childStudent.class && /^(CP|CE|CM)/i.test(childStudent.class);
                 return (
@@ -2576,7 +2654,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
                         <div className="w-[52px] h-[52px] bg-white rounded-full flex items-center justify-center shrink-0 shadow-sm">
                           {/* We try to use the color mapped to the subject for the logo text */}
                           <span className="font-black text-xl" style={{ color: subject.fill || '#3b82f6' }}>
-                            {subject.name.substring(0, 1).toLowerCase()}{subject.name.includes(' ') ? subject.name.split(' ')[1].substring(0, 1).toLowerCase() : subject.name.substring(1, 2).toLowerCase()}
+                            {(subject.name || '').substring(0, 1).toLowerCase()}{(subject.name || '').includes(' ') ? (subject.name || '').split(' ')[1].substring(0, 1).toLowerCase() : (subject.name || '').substring(1, 2).toLowerCase()}
                           </span>
                         </div>
                         <div className="flex flex-col gap-0.5">
