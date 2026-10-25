@@ -592,7 +592,15 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       setIsAddTeacherModalOpen(false);
   };
 
-  const isLevel1 = currentUser?.accessLevel === 1 || currentUser?.role === 'student' || currentUser?.role === 'parent';
+  const isStudent = Boolean(
+    currentUser && (
+      currentUser.role === 'student' ||
+      currentUser.role === 'élève' ||
+      currentUser.role === 'eleve' ||
+      currentUser.accessLevel === 1
+    )
+  );
+  const isLevel1 = isStudent || currentUser?.role === 'parent';
   const isDirectorOrAdmin = Boolean(
     currentUser && (
       currentUser.accessLevel === 5 ||
@@ -608,6 +616,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       currentUser.accessLevel === 3
     )
   );
+  const canAccessAgenda = !isStudent && !isLevel1 && (isTeacherRole || isDirectorOrAdmin);
 
   // Check if a specific teacher card belongs to the currently logged in user
   const isCurrentTeacherSelf = (t: Teacher) => {
@@ -758,6 +767,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
   }, [currentUser, teachers, isTeacherRole]);
 
   const handleOpenMyAgenda = () => {
+    if (!canAccessAgenda || isStudent || isLevel1) return;
     if (myTeacherProfile) {
       handleOpenSchedule(myTeacherProfile);
     } else if (currentUser && isTeacherRole) {
@@ -789,12 +799,14 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
     const shouldOpen = localStorage.getItem('open_my_schedule_auto');
     if (shouldOpen === 'true') {
       localStorage.removeItem('open_my_schedule_auto');
-      const timer = setTimeout(() => {
-        handleOpenMyAgenda();
-      }, 60);
-      return () => clearTimeout(timer);
+      if (canAccessAgenda) {
+        const timer = setTimeout(() => {
+          handleOpenMyAgenda();
+        }, 60);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [currentUser, teachers, myTeacherProfile]);
+  }, [currentUser, teachers, myTeacherProfile, canAccessAgenda]);
 
   // Check if current user can edit this schedule (non-student, non-parent)
   const canEdit = selectedTeacher && (!currentUser || (
@@ -1750,15 +1762,17 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
             </div>
             <div className="flex items-center space-x-3">
                 {/* Mon agenda direct button (Desktop) */}
-                <button
-                    type="button"
-                    onClick={handleOpenMyAgenda}
-                    className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 px-3.5 py-2 rounded-xl border border-white/30 text-white transition-all font-bold text-sm shadow-sm active:scale-95 cursor-pointer backdrop-blur-md"
-                    title="Consulter mon agenda et mon emploi du temps"
-                >
-                    <Calendar size={17} />
-                    <span>Mon agenda</span>
-                </button>
+                {canAccessAgenda && (
+                  <button
+                      type="button"
+                      onClick={handleOpenMyAgenda}
+                      className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 px-3.5 py-2 rounded-xl border border-white/30 text-white transition-all font-bold text-sm shadow-sm active:scale-95 cursor-pointer backdrop-blur-md"
+                      title="Consulter mon agenda et mon emploi du temps"
+                  >
+                      <Calendar size={17} />
+                      <span>Mon agenda</span>
+                  </button>
+                )}
 
                 {/* Plus Button with Menu (Desktop) */}
                 {!isLevel1 && (
@@ -1784,22 +1798,24 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                             transition={{ duration: 0.15 }}
                             className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-1.5 z-50 text-slate-800"
                           >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowPlusMenu(false);
-                                handleOpenMyAgenda();
-                              }}
-                              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-sky-50 text-left transition-colors group cursor-pointer"
-                            >
-                              <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center shrink-0 group-hover:bg-sky-600 group-hover:text-white transition-colors">
-                                <Calendar size={18} />
-                              </div>
-                              <div>
-                                <p className="text-xs font-black text-slate-900 group-hover:text-sky-600">Mon agenda</p>
-                                <p className="text-[11px] text-slate-500">Voir mon emploi du temps</p>
-                              </div>
-                            </button>
+                            {canAccessAgenda && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowPlusMenu(false);
+                                  handleOpenMyAgenda();
+                                }}
+                                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-sky-50 text-left transition-colors group cursor-pointer"
+                              >
+                                <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center shrink-0 group-hover:bg-sky-600 group-hover:text-white transition-colors">
+                                  <Calendar size={18} />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-black text-slate-900 group-hover:text-sky-600">Mon agenda</p>
+                                  <p className="text-[11px] text-slate-500">Voir mon emploi du temps</p>
+                                </div>
+                              </button>
+                            )}
 
                             <button
                               type="button"
@@ -1905,15 +1921,17 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                 </div>
                 <div className="flex space-x-1.5 items-center">
                     {/* Mon agenda direct button (Mobile) */}
-                    <button 
-                        type="button"
-                        onClick={handleOpenMyAgenda}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/40 hover:bg-white/60 text-slate-900 backdrop-blur-md border border-white/50 text-xs font-bold transition-all shadow-sm active:scale-95"
-                        title="Mon agenda"
-                    >
-                        <Calendar size={13} />
-                        <span className="hidden xs:inline">Agenda</span>
-                    </button>
+                    {canAccessAgenda && (
+                      <button 
+                          type="button"
+                          onClick={handleOpenMyAgenda}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/40 hover:bg-white/60 text-slate-900 backdrop-blur-md border border-white/50 text-xs font-bold transition-all shadow-sm active:scale-95"
+                          title="Mon agenda"
+                      >
+                          <Calendar size={13} />
+                          <span className="hidden xs:inline">Agenda</span>
+                      </button>
+                    )}
 
                     {/* Plus Menu (Mobile) */}
                     {!isLevel1 && (
@@ -1939,22 +1957,24 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                                 transition={{ duration: 0.15 }}
                                 className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 p-1.5 z-50 text-slate-800"
                               >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowMobilePlusMenu(false);
-                                    handleOpenMyAgenda();
-                                  }}
-                                  className="w-full flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-sky-50 text-left transition-colors group cursor-pointer"
-                                >
-                                  <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
-                                    <Calendar size={16} />
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-bold text-slate-900">Mon agenda</p>
-                                    <p className="text-[10px] text-slate-500">Voir mon emploi du temps</p>
-                                  </div>
-                                </button>
+                                {canAccessAgenda && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowMobilePlusMenu(false);
+                                      handleOpenMyAgenda();
+                                    }}
+                                    className="w-full flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-sky-50 text-left transition-colors group cursor-pointer"
+                                  >
+                                    <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+                                      <Calendar size={16} />
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-bold text-slate-900">Mon agenda</p>
+                                      <p className="text-[10px] text-slate-500">Voir mon emploi du temps</p>
+                                    </div>
+                                  </button>
+                                )}
 
                                 <button
                                   type="button"

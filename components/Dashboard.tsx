@@ -2710,33 +2710,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ preSelectedStudent, allStu
                 transition={{ duration: 0.2 }}
                 className="flex flex-col items-end space-y-3 mb-4 z-[100]"
               >
-                {/* Mon agenda : Emploi du temps du prof si prof, ou emploi du temps élève si élève */}
-                <button 
-                  onClick={() => { 
-                    setDesktopFloatingMenuOpen(false); 
-                    const isTeacher = currentUser?.role === 'teacher' || 
-                                      currentUser?.role === 'professeur' || 
-                                      currentUser?.role === 'prof' || 
-                                      currentUser?.role === 'enseignant' || 
-                                      currentUser?.accessLevel === 3 || 
-                                      Boolean(currentUser?.isTeacher) || 
-                                      Boolean(currentUser?.subject);
-
-                    if (isTeacher) {
+                {/* Mon agenda : Uniquement pour les professeurs (les élèves n'ont pas accès à cette fonctionnalité) */}
+                {!(currentUser?.role === 'student' || currentUser?.role === 'élève' || currentUser?.role === 'eleve' || (currentUser?.accessLevel === 1 && !isTeacherRole)) && isTeacherRole && (
+                  <button 
+                    onClick={() => { 
+                      setDesktopFloatingMenuOpen(false); 
                       localStorage.setItem('open_my_schedule_auto', 'true');
                       onNavigate?.('teachers'); 
-                    } else {
-                      onNavigate?.('schedule');
-                    }
-                  }} 
-                  className="flex items-center space-x-3 bg-white pl-4 pr-1.5 py-1.5 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:scale-105 transition-transform border border-slate-50 w-max cursor-pointer"
-                  title="Consulter mon agenda et mon emploi du temps"
-                >
-                  <span className="text-slate-700 font-semibold text-[14px]">Mon agenda</span>
-                  <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 shrink-0">
-                    <Calendar size={16} className="text-sky-600" />
-                  </div>
-                </button>
+                    }} 
+                    className="flex items-center space-x-3 bg-white pl-4 pr-1.5 py-1.5 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:scale-105 transition-transform border border-slate-50 w-max cursor-pointer"
+                    title="Consulter mon agenda et mon emploi du temps"
+                  >
+                    <span className="text-slate-700 font-semibold text-[14px]">Mon agenda</span>
+                    <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 shrink-0">
+                      <Calendar size={16} className="text-sky-600" />
+                    </div>
+                  </button>
+                )}
 
                 <button 
                   onClick={() => { setDesktopFloatingMenuOpen(false); onNavigate?.('card'); }} 
