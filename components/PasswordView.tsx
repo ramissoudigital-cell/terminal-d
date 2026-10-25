@@ -245,26 +245,26 @@ export const PasswordView: React.FC<PasswordViewProps> = ({ onBack }) => {
             <motion.div
               animate={errorShake ? { x: [-10, 10, -10, 10, 0] } : {}}
               transition={{ duration: 0.4 }}
-              className="flex items-center gap-4 sm:gap-5 mb-3 sm:mb-5 h-[18px]"
+              className="flex items-center gap-4 sm:gap-5 mb-4 sm:mb-6 h-[22px]"
             >
               {[0, 1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-full border-2 transition-all duration-200 ${
                     activePin.length > i 
-                      ? 'bg-sky-400 border-sky-400 scale-110 shadow-sm shadow-sky-400/50' 
+                      ? 'bg-sky-400 border-sky-400 scale-110 shadow-md shadow-sky-400/50' 
                       : 'border-slate-600 bg-transparent'
                   }`}
                 />
               ))}
             </motion.div>
 
-            <div className="grid grid-cols-3 gap-x-5 sm:gap-x-7 gap-y-2 sm:gap-y-3 w-full max-w-[240px] sm:max-w-[260px] mx-auto">
+            <div className="grid grid-cols-3 gap-x-6 sm:gap-x-7 gap-y-3 sm:gap-y-3.5 w-full max-w-[270px] sm:max-w-[290px] mx-auto">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                 <button
                   key={num}
                   onClick={() => handleNumClick(num.toString())}
-                  className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full flex items-center justify-center text-white text-[24px] sm:text-[28px] font-medium active:bg-white/15 hover:bg-white/5 transition-all cursor-pointer select-none active:scale-95 shadow-xs"
+                  className="w-16 h-16 sm:w-18 sm:h-18 mx-auto rounded-full flex items-center justify-center text-white text-[26px] sm:text-[30px] font-semibold bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 active:bg-sky-500/20 active:border-sky-400/50 transition-all cursor-pointer select-none active:scale-95 shadow-xs"
                 >
                   {num}
                 </button>
@@ -273,28 +273,28 @@ export const PasswordView: React.FC<PasswordViewProps> = ({ onBack }) => {
               {step === 'auth' && hasPin ? (
                 <button
                   onClick={tryBiometricAuth}
-                  className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full flex items-center justify-center text-sky-400 active:bg-white/15 hover:bg-white/5 transition-all cursor-pointer active:scale-95"
+                  className="w-16 h-16 sm:w-18 sm:h-18 mx-auto rounded-full flex items-center justify-center text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 active:bg-sky-500/30 transition-all cursor-pointer active:scale-95 shadow-xs"
                   title="Utiliser l'empreinte digitale"
                 >
-                  <Fingerprint size={24} />
+                  <Fingerprint size={26} />
                 </button>
               ) : (
-                <div className="w-14 h-14 sm:w-16 sm:h-16" />
+                <div className="w-16 h-16 sm:w-18 sm:h-18" />
               )}
 
               <button
                 onClick={() => handleNumClick('0')}
-                className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full flex items-center justify-center text-white text-[24px] sm:text-[28px] font-medium active:bg-white/15 hover:bg-white/5 transition-all cursor-pointer select-none active:scale-95 shadow-xs"
+                className="w-16 h-16 sm:w-18 sm:h-18 mx-auto rounded-full flex items-center justify-center text-white text-[26px] sm:text-[30px] font-semibold bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 active:bg-sky-500/20 active:border-sky-400/50 transition-all cursor-pointer select-none active:scale-95 shadow-xs"
               >
                 0
               </button>
 
               <button
                 onClick={handleBackspace}
-                className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full flex items-center justify-center text-slate-400 active:bg-white/15 hover:bg-white/5 transition-all active:text-white cursor-pointer active:scale-95"
+                className="w-16 h-16 sm:w-18 sm:h-18 mx-auto rounded-full flex items-center justify-center text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 active:bg-red-500/20 active:border-red-400/50 transition-all cursor-pointer active:scale-95 shadow-xs"
                 title="Effacer"
               >
-                <Delete size={24} strokeWidth={1.75} />
+                <Delete size={26} strokeWidth={1.75} />
               </button>
             </div>
           </>

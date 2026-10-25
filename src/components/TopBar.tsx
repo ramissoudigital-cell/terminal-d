@@ -1,6 +1,6 @@
 import React from 'react';
 import { EditorMode } from '../types';
-import { Maximize2, Minimize2, Sun, Moon } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
 interface TopBarProps {
   currentMode: EditorMode;
@@ -10,8 +10,6 @@ interface TopBarProps {
   onOpenDocsDrawer: () => void;
   isZenMode: boolean;
   onToggleZenMode: () => void;
-  isDarkMode: boolean;
-  onToggleDarkMode: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -22,8 +20,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenDocsDrawer,
   isZenMode,
   onToggleZenMode,
-  isDarkMode,
-  onToggleDarkMode,
 }) => {
   return (
     <header className="no-print flex items-center justify-between gap-8 px-6 py-3.5 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-sm border-b border-neutral-200/80 dark:border-neutral-800 transition-colors">
@@ -80,16 +76,8 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
       </nav>
 
-      {/* Zone 3: Primary Actions (Dark mode toggle + Zen mode) */}
+      {/* Zone 3: Primary Actions (Zen mode) */}
       <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={onToggleDarkMode}
-          title={isDarkMode ? "Passer en mode clair" : "Activer le mode sombre profond"}
-          className="p-2 text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-md transition-colors cursor-pointer"
-        >
-          {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-neutral-700" />}
-        </button>
-
         <button
           onClick={onToggleZenMode}
           title={isZenMode ? "Quitter le plein écran" : "Plein écran sans distraction"}

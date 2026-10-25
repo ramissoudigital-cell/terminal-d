@@ -50,28 +50,10 @@ const MOBILE_EXCLUDED_PAGES = [
 ];
 
 const App: React.FC = () => {
-  // Initialize dark mode from localStorage
+  // Ensure dark mode is fully disabled
   useEffect(() => {
-    const isDark = localStorage.getItem('app_dark_mode') === 'true';
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    const handleStorageChange = () => {
-      const darkModeEnabled = localStorage.getItem('app_dark_mode') === 'true';
-      if (darkModeEnabled) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('dark-mode-toggle', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('dark-mode-toggle', handleStorageChange);
-    };
+    localStorage.removeItem('app_dark_mode');
+    document.documentElement.classList.remove('dark');
   }, []);
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {

@@ -1,6 +1,11 @@
 import { Capacitor } from '@capacitor/core';
 
+/**
+ * Check if real hardware biometric authentication (Fingerprint, Touch ID, Face ID, Windows Hello)
+ * is supported on this device/browser.
+ */
 export async function isBiometricAvailable(): Promise<boolean> {
+  // 1. Native mobile app wrapper via Capacitor
   if (Capacitor.isNativePlatform()) {
     try {
       const pluginName = '@capgo/capacitor-native-biometric';
@@ -10,20 +15,62 @@ export async function isBiometricAvailable(): Promise<boolean> {
         const res = await NativeBiometric.isAvailable();
         return !!res?.isAvailable;
       }
-    } catch (e) {
-      // Fallback
+    } catch {
+      // Fall through to web check
     }
   }
-  // Available on web via simulated/WebAuthn biometric
-  return true;
+
+  // 2. Web Authentication API (WebAuthn) with platform authenticator
+  if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+    try {
+      if (typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+        const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        return available;
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  }
+
+  return false;
 }
 
+// Helper: Convert ArrayBuffer to Base64URL string
+function bufferToBase64Url(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// Helper: Convert Base64URL string to Uint8Array
+function base64UrlToUint8Array(base64url: string): Uint8Array {
+  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) {
+    base64 += '=';
+  }
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
+ * Real device biometric identity verification (Real-time biometric using hardware sensor:
+ * Fingerprint, Touch ID, Face ID, Windows Hello, Android Biometric Prompt).
+ */
 export async function verifyBiometricIdentity(options?: {
   reason?: string;
   title?: string;
   subtitle?: string;
   description?: string;
 }): Promise<boolean> {
+  // 1. Native Mobile platform biometrics (Android / iOS)
   if (Capacitor.isNativePlatform()) {
     try {
       const pluginName = '@capgo/capacitor-native-biometric';
@@ -38,64 +85,97 @@ export async function verifyBiometricIdentity(options?: {
         });
         return true;
       }
-    } catch (e) {
-      // Native failed or cancelled
+    } catch (e: any) {
+      console.warn('Native biometric cancelled or failed:', e);
+      return false;
     }
   }
 
-  // Web interactive biometric simulation modal
-  return new Promise((resolve) => {
-    const existingModal = document.getElementById('web-biometric-scanner-modal');
-    if (existingModal) existingModal.remove();
+  // 2. Real WebAuthn platform authenticator (Touch ID, Face ID, Windows Hello, Android Fingerprint)
+  if (typeof window !== 'undefined' && window.PublicKeyCredential && navigator.credentials) {
+    try {
+      const savedCredentialId = localStorage.getItem('webauthn_credential_id');
 
-    const overlay = document.createElement('div');
-    overlay.id = 'web-biometric-scanner-modal';
-    overlay.className = 'fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200 select-none';
-    
-    overlay.innerHTML = `
-      <div class="bg-slate-900 border border-slate-800 text-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center flex flex-col items-center relative overflow-hidden">
-        <div class="w-20 h-20 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center mb-4 relative shadow-lg shadow-sky-500/20">
-          <svg class="w-10 h-10 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/>
-            <path d="M14 13.12c0 2.38 0 3.63 1 4.88"/>
-            <path d="M17 16.95V19a2 2 0 0 1-2 2h-2"/>
-            <path d="M18 10a6 6 0 0 0-12 0v2"/>
-            <path d="M9 19a2 2 0 0 1-2-2v-2.5"/>
-            <path d="M2 12h2"/>
-            <path d="M20 12h2"/>
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold text-white mb-1.5">${options?.title || "Empreinte digitale"}</h3>
-        <p class="text-xs text-slate-400 mb-6 font-medium leading-relaxed">${options?.reason || "Touchez le capteur d'empreinte pour confirmer votre identité"}</p>
-        
-        <div class="w-full space-y-3">
-          <button id="web-bio-scan-btn" class="w-full py-3.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-sky-500/25 transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/>
-              <path d="M14 13.12c0 2.38 0 3.63 1 4.88"/>
-              <path d="M18 10a6 6 0 0 0-12 0v2"/>
-            </svg>
-            <span>Poser le doigt / Valider</span>
-          </button>
-          <button id="web-bio-cancel-btn" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-2xl transition-all cursor-pointer text-xs">
-            Annuler
-          </button>
-        </div>
-      </div>
-    `;
+      // If already registered, perform real-time verification (navigator.credentials.get)
+      if (savedCredentialId) {
+        try {
+          const challenge = new Uint8Array(32);
+          window.crypto.getRandomValues(challenge);
 
-    document.body.appendChild(overlay);
+          const rawId = base64UrlToUint8Array(savedCredentialId);
+          const assertion = await navigator.credentials.get({
+            publicKey: {
+              challenge,
+              timeout: 60000,
+              userVerification: 'required', // Demande explicitement l'empreinte / Face ID / PIN de l'appareil
+              allowCredentials: [
+                {
+                  id: rawId,
+                  type: 'public-key',
+                },
+              ],
+            },
+          });
 
-    const cleanup = (success: boolean) => {
-      overlay.remove();
-      resolve(success);
-    };
+          if (assertion) {
+            return true;
+          }
+        } catch (getErr: any) {
+          // If the user cancelled the biometric prompt, return false
+          if (getErr?.name === 'NotAllowedError' || getErr?.name === 'AbortError') {
+            console.warn('Vérification biométrique annulée par l\'utilisateur:', getErr);
+            return false;
+          }
+          // If credential is unknown or expired on device, remove saved ID and fallback to registration below
+          localStorage.removeItem('webauthn_credential_id');
+        }
+      }
 
-    overlay.querySelector('#web-bio-scan-btn')?.addEventListener('click', () => cleanup(true));
-    overlay.querySelector('#web-bio-cancel-btn')?.addEventListener('click', () => cleanup(false));
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) cleanup(false);
-    });
-  });
+      // If no credential or first enrollment, trigger real OS registration (navigator.credentials.create)
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+
+      const userId = new Uint8Array(16);
+      window.crypto.getRandomValues(userId);
+
+      const newCredential = (await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: {
+            name: "Mon École Directe",
+          },
+          user: {
+            id: userId,
+            name: "utilisateur@ecole-directe.app",
+            displayName: "Utilisateur Mon École Directe",
+          },
+          pubKeyCredParams: [
+            { alg: -7, type: 'public-key' },  // ES256
+            { alg: -257, type: 'public-key' }, // RS256
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform', // Hardware sensor: Touch ID, Face ID, Empreinte digitale, Windows Hello
+            userVerification: 'required',
+            residentKey: 'preferred',
+          },
+          timeout: 60000,
+        },
+      })) as PublicKeyCredential | null;
+
+      if (newCredential && newCredential.rawId) {
+        const credId = bufferToBase64Url(newCredential.rawId);
+        localStorage.setItem('webauthn_credential_id', credId);
+        localStorage.setItem('biometric_enabled', 'true');
+        return true;
+      }
+    } catch (err: any) {
+      console.warn('Biométrie WebAuthn info:', err);
+      if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') {
+        // User cancelled or biometric prompt was rejected
+        return false;
+      }
+    }
+  }
+
+  return false;
 }
-

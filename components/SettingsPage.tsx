@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Save, User, Bell, Lock, Camera, CheckCircle, Shield, Smartphone, Mail, Eye, EyeOff, LogOut, Info, Sparkles, GraduationCap, ShieldCheck, Heart, HelpCircle, Globe, Code, CheckCircle2, Zap, Loader2, Trash2, ArrowLeft, BookOpen, KeyRound, RotateCcw, Search, Copy, Check, Palette, Moon, Sun, PenLine, Fingerprint, Delete } from 'lucide-react';
+import { Save, User, Bell, Lock, Camera, CheckCircle, Shield, Smartphone, Mail, Eye, EyeOff, LogOut, Info, Sparkles, GraduationCap, ShieldCheck, Heart, HelpCircle, Globe, Code, CheckCircle2, Zap, Loader2, Trash2, ArrowLeft, BookOpen, KeyRound, RotateCcw, Search, Copy, Check, PenLine, Fingerprint, Delete } from 'lucide-react';
 import { User as UserType } from '../types';
 import { compressImage, getDefaultAvatar, getRoleLabel } from '../src/utils/userUtils';
 import { BilanFinAnnee } from "./BilanFinAnnee";
@@ -39,19 +39,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
 
   const { permissionStatus, requestPermissionAndGetToken } = useNotifications();
 
-  // --- DARK MODE STATE ---
-  const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem('app_dark_mode') === 'true';
-  });
 
-  useEffect(() => {
-    localStorage.setItem('app_dark_mode', String(darkMode));
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [darkMode]);
 
   // --- PROFILE STATE ---
   const [profile, setProfile] = useState({
@@ -1534,21 +1522,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
         );
 
 
-      case 'appearance':
-        return (
-            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                <h2 className="text-xl font-bold text-gray-800 mb-6">Apparence</h2>
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                    <ToggleItem 
-                        title="Mode Nuit" 
-                        description="Activer le thème sombre pour une meilleure visibilité nocturne."
-                        icon={darkMode ? <Moon size={20} className="text-indigo-400" /> : <Sun size={20} className="text-amber-500" />}
-                        active={darkMode}
-                        onToggle={() => setDarkMode(!darkMode)}
-                    />
-                </div>
-            </div>
-        );
+
       case 'about':
         return (
             <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-8">
@@ -2171,12 +2145,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, currentUse
                     active={activeTab === 'about'}
                     onClick={() => setActiveTab('about')}
                 />
-                 <SettingsItem 
-                    icon={<Palette size={18} />} 
-                    label="Apparence" 
-                    active={activeTab === 'appearance'}
-                    onClick={() => setActiveTab('appearance')}
-                />
+
                 <div className="hidden md:block w-full h-px bg-gray-100 my-2"></div>
                 <button 
                     onClick={() => setShowLogoutConfirm(true)}
