@@ -4,6 +4,42 @@ html, body, #root {
   background-color: #BFDBFE;
 }
 
+html.dark, html.dark body, html.dark #root {
+  background-color: #020617 !important;
+  color: #f8fafc !important;
+}
+
+.dark .bg-white {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+.dark .text-gray-500,
+.dark .text-gray-600,
+.dark .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+.dark .bg-gray-50,
+.dark .bg-slate-50 {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-slate-100,
+.dark .border-slate-200 {
+  border-color: #334155 !important;
+}
+
+
 /* Hide all print buttons on mobile / small screens (< 640px) */
 @media screen and (max-width: 639px) {
   .btn-print,

@@ -716,7 +716,19 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
     };
   }, [scheduleData]);
 
+  const canViewTeacherSchedule = (t: Teacher) => {
+    if (isDirectorOrAdmin) return true;
+    if (isTeacherRole) {
+      return isCurrentTeacherSelf(t);
+    }
+    return !isLevel1;
+  };
+
   const handleOpenSchedule = (teacher: Teacher) => {
+      if (isTeacherRole && !isDirectorOrAdmin && !isCurrentTeacherSelf(teacher)) {
+        alert("Accès confidentiel : Vous ne pouvez consulter que votre propre emploi du temps.");
+        return;
+      }
       setSelectedTeacher(teacher);
       setScheduleData(getTeacherSchedule(teacher)); // Initialize schedule state
       setMobileDayIndex(0); 
@@ -759,7 +771,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
         level: "Secondaire",
         email: currentUser.email || "",
         phone: currentUser.phone || "",
-        photo: currentUser.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600",
+        photo: currentUser.photo || currentUser.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600",
         assignedClasses: currentUser.assignedClass ? [currentUser.assignedClass] : ["Terminale D1"],
         status: "Actif",
         uid: currentUser.id,
@@ -771,6 +783,18 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
       handleOpenSchedule(teachers[0]);
     }
   };
+
+  // Auto-open schedule if requested from Dashboard ("Mon agenda" button)
+  useEffect(() => {
+    const shouldOpen = localStorage.getItem('open_my_schedule_auto');
+    if (shouldOpen === 'true') {
+      localStorage.removeItem('open_my_schedule_auto');
+      const timer = setTimeout(() => {
+        handleOpenMyAgenda();
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [currentUser, teachers, myTeacherProfile]);
 
   // Check if current user can edit this schedule (non-student, non-parent)
   const canEdit = selectedTeacher && (!currentUser || (
@@ -2028,6 +2052,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                         )
                       );
                       const showScheduleBtn = !isLevel1;
+                      const canViewSchedule = canViewTeacherSchedule(teacher);
 
                       return (
                           <tr key={teacher.id || idx} className="hover:bg-slate-50/80 transition-colors group print:hover:bg-transparent">
@@ -2142,13 +2167,19 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                                   <Mail size={16} />
                                 </button>
                                 {showScheduleBtn && (
-                                  <button
-                                    onClick={() => handleOpenSchedule(teacher)}
-                                    title="Voir Emploi du temps"
-                                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                  >
-                                    <Calendar size={16} />
-                                  </button>
+                                  canViewSchedule ? (
+                                    <button
+                                      onClick={() => handleOpenSchedule(teacher)}
+                                      title="Voir Emploi du temps"
+                                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      <Calendar size={16} />
+                                    </button>
+                                  ) : isTeacherRole ? (
+                                    <span className="p-2 text-slate-300 flex items-center justify-center" title="Confidentiel (seul ce professeur ou la direction peut consulter son planning)">
+                                      <Lock size={14} />
+                                    </span>
+                                  ) : null
                                 )}
                               </div>
                             </td>
@@ -2193,6 +2224,7 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                         )
                       );
                       const showScheduleBtn = !isLevel1;
+                      const canViewSchedule = canViewTeacherSchedule(teacher);
 
                       return (
                         <div key={teacher.id} className="relative flex flex-col items-center w-full max-w-[310px]">
@@ -2298,7 +2330,11 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
                               width={300}
                               height={335}
                               onClick={() => {
-                                if (showScheduleBtn) handleOpenSchedule(teacher);
+                                if (canViewSchedule) {
+                                  handleOpenSchedule(teacher);
+                                } else if (isTeacherRole && !isMe) {
+                                  alert("Accès confidentiel : Vous ne pouvez consulter que votre propre emploi du temps.");
+                                }
                               }}
                               extraBadge={
                                 <div className="flex items-center gap-1.5">
@@ -2358,18 +2394,28 @@ export const TeachersPage: React.FC<TeachersPageProps> = ({ teachers = [], curre
 
                             {/* Planning Button */}
                             {showScheduleBtn && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenSchedule(teacher);
-                                }}
-                                className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 px-2.5 rounded-2xl text-[12px] font-bold bg-sky-500 hover:bg-sky-600 text-white shadow-sm transition-all cursor-pointer active:scale-95"
-                                title="Voir Emploi du temps"
-                              >
-                                <Calendar size={14} className="shrink-0" />
-                                <span className="truncate">Planning</span>
-                              </button>
+                              canViewSchedule ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenSchedule(teacher);
+                                  }}
+                                  className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 px-2.5 rounded-2xl text-[12px] font-bold bg-sky-500 hover:bg-sky-600 text-white shadow-sm transition-all cursor-pointer active:scale-95"
+                                  title="Voir Emploi du temps"
+                                >
+                                  <Calendar size={14} className="shrink-0" />
+                                  <span className="truncate">{isMe ? "Mon Planning" : "Planning"}</span>
+                                </button>
+                              ) : isTeacherRole ? (
+                                <div
+                                  className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 px-2.5 rounded-2xl text-[12px] font-semibold bg-slate-100 text-slate-400 border border-slate-200 select-none cursor-not-allowed"
+                                  title="Emploi du temps confidentiel"
+                                >
+                                  <Lock size={13} className="shrink-0" />
+                                  <span className="truncate text-[11px]">Confidentiel</span>
+                                </div>
+                              ) : null
                             )}
                           </div>
                         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Minus, FileText, Printer, ChevronDown, ArrowUpRight, CheckCircle2, Clock, BookOpen, ChevronRight, X, XCircle, Plus, PenLine, Trash2, Save, Megaphone, TrendingUp, UserPlus, AlertOctagon, Settings, Check, ShoppingBag, Bell, Users, Building2, Crown, Award, HeartHandshake, GraduationCap, Camera, Upload, Image, Sparkles, MessageSquare, CreditCard } from 'lucide-react';
+import { Search, Minus, FileText, Printer, ChevronDown, ArrowUpRight, CheckCircle2, Clock, BookOpen, ChevronRight, X, XCircle, Plus, PenLine, Trash2, Save, Megaphone, TrendingUp, UserPlus, AlertOctagon, Settings, Check, ShoppingBag, Bell, Users, Building2, Crown, Award, HeartHandshake, GraduationCap, Camera, Upload, Image, Sparkles, MessageSquare, CreditCard, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SpendsChart } from './SpendsChart';
 import { AppreciationCard } from './AppreciationCard';
@@ -2605,6 +2605,34 @@ export default function WalletDashboard({
                       transition={{ duration: 0.2 }}
                       className="flex flex-col items-end space-y-3 mb-4"
                   >
+                      {/* Mon agenda : Emploi du temps du prof si prof, ou emploi du temps élève si élève */}
+                      <button 
+                        onClick={() => { 
+                          setFloatingMenuOpen(false); 
+                          const isTeacher = currentUser?.role === 'teacher' || 
+                                            currentUser?.role === 'professeur' || 
+                                            currentUser?.role === 'prof' || 
+                                            currentUser?.role === 'enseignant' || 
+                                            currentUser?.accessLevel === 3 || 
+                                            Boolean(currentUser?.isTeacher) || 
+                                            Boolean(currentUser?.subject);
+
+                          if (isTeacher) {
+                            localStorage.setItem('open_my_schedule_auto', 'true');
+                            handleNav('teachers'); 
+                          } else {
+                            handleNav('schedule');
+                          }
+                        }} 
+                        className="flex items-center space-x-3 bg-white pl-4 pr-1.5 py-1.5 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:scale-105 transition-transform border border-slate-50 w-max cursor-pointer"
+                        title="Consulter mon agenda et mon emploi du temps"
+                      >
+                          <span className="text-slate-700 font-semibold text-[14px]">Mon agenda</span>
+                          <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 shrink-0">
+                              <Calendar size={16} className="text-sky-600" />
+                          </div>
+                      </button>
+
                       <button onClick={() => { setFloatingMenuOpen(false); handleNav('card'); }} className="flex items-center space-x-3 bg-white pl-4 pr-1.5 py-1.5 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:scale-105 transition-transform border border-slate-50 w-max cursor-pointer">
                           <span className="text-slate-700 font-semibold text-[14px]">Ma carte</span>
                           <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-600">

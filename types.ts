@@ -160,6 +160,7 @@ export interface User {
   role: UserRole;
   accessLevel: number; // 1 à 5
   pinCode: string; 
+  password?: string;
   photo?: string;
   bio?: string;
   faceIdEnabled?: boolean;

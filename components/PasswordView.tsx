@@ -198,26 +198,26 @@ export const PasswordView: React.FC<PasswordViewProps> = ({ onBack }) => {
   const showKeypad = step === 'auth' || step === 'create' || step === 'confirm';
 
   return (
-    <div className="fixed inset-0 z-[100] h-full w-full bg-slate-900 overflow-hidden flex flex-col items-center font-sans select-none">
-      <div className="pt-12 sm:pt-14 px-6 flex items-center justify-between relative w-full mb-6">
+    <div className="fixed inset-0 z-[100] h-full w-full bg-slate-900 overflow-y-auto custom-scrollbar flex flex-col items-center justify-between font-sans select-none px-4 py-3 sm:py-6">
+      <div className="w-full max-w-sm flex items-center justify-between shrink-0 mb-1">
         <button
           onClick={onBack}
-          className="w-12 h-12 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors active:bg-white/20 z-10 cursor-pointer"
+          className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors active:bg-white/20 cursor-pointer text-white"
           title="Retour aux paramètres"
         >
-          <ChevronLeft size={28} className="text-white" />
+          <ChevronLeft size={26} />
         </button>
       </div>
 
-      <div className="flex-1 w-full flex flex-col items-center justify-center px-6 pb-16">
+      <div className="w-full max-w-sm flex-1 flex flex-col items-center justify-center shrink-0 my-auto pb-4 sm:pb-6">
         <motion.div
           key={step}
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-col items-center"
+          transition={{ duration: 0.25 }}
+          className="flex flex-col items-center text-center w-full"
         >
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 ${
+          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center mb-2.5 sm:mb-3 shadow-md ${
             step === 'warning' 
               ? 'bg-red-500/20 text-red-400' 
               : step === 'removed' 
@@ -225,17 +225,17 @@ export const PasswordView: React.FC<PasswordViewProps> = ({ onBack }) => {
               : 'bg-sky-500/20 text-sky-400'
           }`}>
             {step === 'biometric' ? (
-              <Fingerprint size={32} />
+              <Fingerprint size={26} />
             ) : step === 'warning' ? (
-              <X size={32} />
+              <X size={26} />
             ) : step === 'removed' ? (
-              <Unlock size={32} />
+              <Unlock size={26} />
             ) : (
-              <Lock size={32} />
+              <Lock size={26} />
             )}
           </div>
-          <h1 className="text-[24px] font-bold text-white tracking-tight mb-2 text-center">{title}</h1>
-          <p className="text-slate-400 text-center mb-8 text-[15px] whitespace-pre-line leading-relaxed">
+          <h1 className="text-[19px] sm:text-[22px] font-bold text-white tracking-tight mb-1 text-center">{title}</h1>
+          <p className="text-slate-400 text-center mb-3 sm:mb-5 text-[12px] sm:text-[13px] whitespace-pre-line leading-snug max-w-xs">
             {subtitle}
           </p>
         </motion.div>
@@ -245,12 +245,12 @@ export const PasswordView: React.FC<PasswordViewProps> = ({ onBack }) => {
             <motion.div
               animate={errorShake ? { x: [-10, 10, -10, 10, 0] } : {}}
               transition={{ duration: 0.4 }}
-              className="flex items-center gap-6 mb-8 h-[20px]"
+              className="flex items-center gap-4 sm:gap-5 mb-3 sm:mb-5 h-[18px]"
             >
               {[0, 1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className={`w-[18px] h-[18px] rounded-full border-2 transition-all duration-200 ${
+                  className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 transition-all duration-200 ${
                     activePin.length > i 
                       ? 'bg-sky-400 border-sky-400 scale-110 shadow-sm shadow-sky-400/50' 
                       : 'border-slate-600 bg-transparent'
@@ -259,12 +259,12 @@ export const PasswordView: React.FC<PasswordViewProps> = ({ onBack }) => {
               ))}
             </motion.div>
 
-            <div className="grid grid-cols-3 gap-x-8 gap-y-6 w-full max-w-[280px]">
+            <div className="grid grid-cols-3 gap-x-5 sm:gap-x-7 gap-y-2 sm:gap-y-3 w-full max-w-[240px] sm:max-w-[260px] mx-auto">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                 <button
                   key={num}
                   onClick={() => handleNumClick(num.toString())}
-                  className="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-white text-[32px] font-medium active:bg-white/10 transition-colors cursor-pointer select-none"
+                  className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full flex items-center justify-center text-white text-[24px] sm:text-[28px] font-medium active:bg-white/15 hover:bg-white/5 transition-all cursor-pointer select-none active:scale-95 shadow-xs"
                 >
                   {num}
                 </button>
@@ -273,28 +273,28 @@ export const PasswordView: React.FC<PasswordViewProps> = ({ onBack }) => {
               {step === 'auth' && hasPin ? (
                 <button
                   onClick={tryBiometricAuth}
-                  className="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-sky-400 active:bg-white/10 transition-colors cursor-pointer"
+                  className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full flex items-center justify-center text-sky-400 active:bg-white/15 hover:bg-white/5 transition-all cursor-pointer active:scale-95"
                   title="Utiliser l'empreinte digitale"
                 >
-                  <Fingerprint size={28} />
+                  <Fingerprint size={24} />
                 </button>
               ) : (
-                <div className="w-20 h-20" />
+                <div className="w-14 h-14 sm:w-16 sm:h-16" />
               )}
 
               <button
                 onClick={() => handleNumClick('0')}
-                className="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-white text-[32px] font-medium active:bg-white/10 transition-colors cursor-pointer select-none"
+                className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full flex items-center justify-center text-white text-[24px] sm:text-[28px] font-medium active:bg-white/15 hover:bg-white/5 transition-all cursor-pointer select-none active:scale-95 shadow-xs"
               >
                 0
               </button>
 
               <button
                 onClick={handleBackspace}
-                className="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-slate-400 active:bg-white/10 transition-colors active:text-white cursor-pointer"
+                className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full flex items-center justify-center text-slate-400 active:bg-white/15 hover:bg-white/5 transition-all active:text-white cursor-pointer active:scale-95"
                 title="Effacer"
               >
-                <Delete size={32} strokeWidth={1.5} />
+                <Delete size={24} strokeWidth={1.75} />
               </button>
             </div>
           </>
