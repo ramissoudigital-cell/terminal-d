@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Bell, Check, MapPin, X, GraduationCap } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Bell, Check, MapPin, X, GraduationCap, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getStoredTimeSlots, getLunchBreakIndex, getCourseSegments } from './SchedulePage';
 import { scheduleCourseNotifications, cancelAllCourseNotifications, triggerImmediateCourseReminder } from '../src/services/NotificationScheduler';
@@ -11,6 +11,8 @@ export interface ScheduleEvent {
     duration: number;
     title: string;
     room: string;
+    school?: string;
+    className?: string;
     color: string;
     customTime?: string;
     teacherName?: string;
@@ -338,12 +340,18 @@ export const DailyScheduleMobileView: React.FC<DailyScheduleMobileViewProps> = (
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors.text }}></div>
                       <h3 className="font-bold text-[14px] leading-tight truncate" style={{ color: colors.text }}>{evt.title}</h3>
                     </div>
-                    <div className="flex items-center gap-1.5 ml-3.5 mb-0.5 relative z-10 text-[12px] font-bold leading-tight" style={{ color: colors.text, opacity: 0.9 }}>
+                    <div className="flex items-center gap-1.5 ml-3.5 mb-0.5 relative z-10 text-[12px] font-bold leading-tight" style={{ color: colors.text, opacity: 0.95 }}>
                       <GraduationCap size={13} className="shrink-0" style={{ color: colors.text }} />
                       <span className="truncate">
-                        {isTeacherSchedule ? (classNameTitle || "Sarah Dubois") : (evt.teacherName?.trim() || getTeacherNameForSubject(evt.title, teachersList))}
+                        {isTeacherSchedule ? (evt.className || "Classe") : (evt.teacherName?.trim() || getTeacherNameForSubject(evt.title, teachersList))}
                       </span>
                     </div>
+                    {evt.school && (
+                      <div className="flex items-center gap-1 ml-3.5 mb-0.5 relative z-10 text-[11px] font-semibold leading-tight truncate" style={{ color: colors.text, opacity: 0.85 }}>
+                        <Building2 size={11} className="shrink-0" />
+                        <span className="truncate">{evt.school}</span>
+                      </div>
+                    )}
                     {evt.room && (
                       <div className="flex items-center gap-1 ml-3.5 relative z-10" style={{ color: colors.text, opacity: 0.8 }}>
                         <MapPin size={11} className="shrink-0" />
@@ -615,6 +623,20 @@ export const DailyScheduleMobileView: React.FC<DailyScheduleMobileViewProps> = (
                       </p>
                     </div>
                   </div>
+                  {selectedEventDetail.school && (
+                    <>
+                      <div className="h-px w-full bg-slate-200/60" />
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full shrink-0 bg-emerald-50 text-emerald-600 flex items-center justify-center border-2 border-white shadow-sm">
+                          <Building2 size={18} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5">Établissement / École</p>
+                          <p className="text-slate-900 font-bold text-[15px]">{selectedEventDetail.school}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex gap-3">

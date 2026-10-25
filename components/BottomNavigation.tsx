@@ -63,16 +63,18 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activePage, 
           animate="show"
           exit="exit"
           variants={{
-            hidden: { opacity: 0, y: 50 },
+            hidden: { opacity: 0, y: 40, scale: 0.96 },
             show: {
               opacity: 1,
               y: 0,
-              transition: { staggerChildren: 0.05, duration: 0.3 }
+              scale: 1,
+              transition: { staggerChildren: 0.04, duration: 0.28, ease: [0.16, 1, 0.3, 1] }
             },
             exit: {
               opacity: 0,
-              y: 50,
-              transition: { staggerChildren: 0.05, staggerDirection: -1, duration: 0.3 }
+              y: 60,
+              scale: 0.94,
+              transition: { duration: 0.24, ease: [0.32, 0.72, 0, 1] }
             }
           }}
           className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] left-0 right-0 flex justify-center items-center space-x-[4px] z-[50] pointer-events-auto px-4"
@@ -83,9 +85,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activePage, 
               <motion.div
                 key={`bnav-${item.id}-${idx}`}
                 variants={{
-                  hidden: { y: 100, opacity: 0 },
-                  show: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 300, damping: 30 } },
-                  exit: { y: 100, opacity: 0, transition: { type: "spring", stiffness: 300, damping: 30 } }
+                  hidden: { y: 40, opacity: 0 },
+                  show: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 320, damping: 28 } },
+                  exit: { y: 40, opacity: 0, transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] } }
                 }}
                 className="relative"
               >
